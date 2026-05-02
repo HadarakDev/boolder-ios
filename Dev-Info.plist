@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Boolder dev</string>
+	<string>TopoSud dev</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -37,12 +37,12 @@
 	<string>Your location will be displayed on the map to help you find your way around.</string>
 	<key>NSUbiquitousContainers</key>
 	<dict>
-		<key>iCloud.boolder-dev</key>
+		<key>iCloud.com.hadarak.toposud-dev</key>
 		<dict>
 			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
 			<true/>
 			<key>NSUbiquitousContainerName</key>
-			<string>Boolder dev</string>
+			<string>TopoSud dev</string>
 			<key>NSUbiquitousContainerSupportedFolderLevels</key>
 			<string>Any</string>
 		</dict>
