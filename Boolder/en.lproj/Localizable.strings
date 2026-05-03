@@ -104,7 +104,7 @@
 "download.cluster.remove.title" = "Clear downloads?";
 "download.cluster.remove.action" = "Clear";
 "download.cluster.tip.title" = "Download areas in advance";
-"download.cluster.tip.message" = "Skip loading times and use Boolder without an Internet connection.";
+"download.cluster.tip.message" = "Skip loading times and use TopoSud without an Internet connection.";
 "download.remove.title" = "Clear download?";
 "download.remove.action" = "Clear";
 "download.cancel.title" = "Stop download?";
