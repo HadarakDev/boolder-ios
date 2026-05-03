@@ -20,7 +20,6 @@ struct ProblemActionButtonsView: View {
     let onCircuitSelected: (() -> Void)?
     
     @State private var presentSaveActionsheet = false
-    @State private var presentSharesheet = false
     @State private var presentCircuitActionsheet = false
     
     init(problem: Problem, withHorizontalPadding: Bool = true, onCircuitSelected: (() -> Void)? = nil) {
@@ -124,20 +123,6 @@ struct ProblemActionButtonsView: View {
                     ActionSheet(title: Text("problem.action.save"), buttons: saveManager.saveButtons())
                 }
                 
-                Button(action: {
-                    presentSharesheet = true
-                }) {
-                    HStack(alignment: .center, spacing: 8) {
-                        Image(systemName: "square.and.arrow.up")
-                        Text("problem.action.share")
-                    }
-                    .adaptivePillPadding()
-                }
-                .adaptivePillStyle()
-                .sheet(isPresented: $presentSharesheet,
-                       content: {
-                    ActivityView(activityItems: [boolderURL] as [Any], applicationActivities: nil)
-                })
             }
             .modify {
                 if withHorizontalPadding {

@@ -232,52 +232,6 @@ struct DiscoverView: View {
                             }
                         }
                         
-                        VStack(alignment: .leading) {
-                            Text("discover.support")
-                                .font(.title2).bold()
-                                .padding(.top, 16)
-                                .padding(.bottom, 8)
-                                .padding(.horizontal)
-                            
-                            VStack(alignment: .leading) {
-                                Divider()
-                                
-                                Button(action: {
-                                    let appID = "1506614493"
-                                    let urlStr = "https://itunes.apple.com/app/id\(appID)?action=write-review"
-                                    guard let url = URL(string: urlStr) else { return }
-                                    openURL(url)
-                                }, label: {
-                                    HStack {
-                                        Image(systemName: "star")
-                                        Text("discover.rate")
-                                        Spacer()
-                                    }
-                                    .font(.body)
-                                    .foregroundColor(.primary)
-                                })
-                                
-                                Divider()
-                                
-                                Button(action: {
-                                    openURL(contributeURL)
-                                }, label: {
-                                    HStack {
-                                        Image(systemName: "plus.app")
-                                        Text("discover.contribute")
-                                        Spacer()
-                                    }
-                                    .font(.body)
-                                    .foregroundColor(.primary)
-                                })
-                                
-                                Divider()
-                            }
-                            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
-                            .padding(.horizontal)
-                            .padding(.bottom)
-                        }
-                        
 #if DEVELOPMENT
                         VStack(alignment: .leading) {
                             Text("Dev")
@@ -319,13 +273,6 @@ struct DiscoverView: View {
             }
         }
         .phoneOnlyStackNavigationView()
-    }
-    
-    var contributeURL: URL {
-        if(NSLocale.websiteLocale == "en") {
-            return URL(string: "https://www.boolder.com/en/contribute")!
-        }
-        return URL(string: "https://www.boolder.com/fr/contribute")!
     }
 }
 
