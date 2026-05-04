@@ -16,6 +16,9 @@ class SqliteStore {
     
     private init() {
         let databaseURL = Bundle.main.url(forResource: "boolder", withExtension: "db")!
-        db = try! Connection(databaseURL.path) // TODO: catch errors
+        // Open read-only: boolder.db lives in the app bundle (read-only FS).
+        // iOS 26 enforces this strictly; opening read-write triggers SQLITE_IOERR
+        // when SQLite tries to create its journal file.
+        db = try! Connection(databaseURL.path, readonly: true) // TODO: catch errors
     }
 }
