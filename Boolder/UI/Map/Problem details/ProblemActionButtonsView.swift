@@ -136,9 +136,5 @@ struct ProblemActionButtonsView: View {
         }
         .scrollClipDisabled()
     }
-    
-    private var boolderURL: URL {
-        URL(string: "https://www.boolder.com/\(NSLocale.websiteLocale)/p/\(String(problem.id))")!
-    }
 }
 
