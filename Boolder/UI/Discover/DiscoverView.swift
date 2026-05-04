@@ -257,8 +257,8 @@ struct DiscoverView: View {
 
                                 NavigationLink(destination: MapMakerHomeView()) {
                                     HStack {
-                                        Image(systemName: "camera.viewfinder")
-                                        Text("Map Maker")
+                                        Image(systemName: "tray.full")
+                                        Text("Map Maker captures")
                                         Spacer()
                                     }
                                     .font(.body)

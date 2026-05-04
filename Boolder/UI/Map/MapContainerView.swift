@@ -21,35 +21,50 @@ struct MapContainerView: View {
     // TODO: make this more DRY
     @State private var presentDownloads = false
     @State private var presentDownloadsPlaceholder = false
-    
+
+    #if DEVELOPMENT
+    @State private var mapMakerTopoEntry = TopoEntry()
+    @State private var presentMapMakerSheet = false
+    #endif
+
     var body: some View {
         @Bindable var mapState = mapState
-        
+
         ZStack {
             mapbox
-            
+
             // fake view acting as an anchor point for poi sheet
             Color.clear.frame(width: 10, height: 10).allowsHitTesting(false)
                 .poiActionSheet(selectedPoi: $mapState.selectedPoi)
-            
+
             aboveSheetNavigationButtons
                 .opacity(mapState.presentProblemDetails ? 1 : 0)
-            
+
             circuitStartButton
-            
+
             fabButtonsContainer
                 .zIndex(10)
-            
+
+            #if DEVELOPMENT
+            mapMakerFab
+                .zIndex(10)
+            #endif
+
             if mapState.selectedArea == nil {
                 searchButtonOverlay
                     .zIndex(20)
             }
-            
+
             AreaToolbarView()
                 .frame(maxWidth: 600)
                 .zIndex(30)
                 .opacity(mapState.selectedArea != nil ? 1 : 0)
         }
+        #if DEVELOPMENT
+        .fullScreenCover(isPresented: $presentMapMakerSheet) {
+            NewTopoView(topoEntry: mapMakerTopoEntry)
+        }
+        #endif
         .sheet(isPresented: $mapState.presentSearch) {
             SearchSheetView()
         }
@@ -302,10 +317,10 @@ struct MapContainerView: View {
     var fabButtonsContainer: some View {
         HStack {
             Spacer()
-            
+
             VStack(alignment: .trailing) {
                 Spacer()
-                
+
                 if #available(iOS 26.0, *) {
                     GlassEffectContainer {
                         fabButtons
@@ -319,6 +334,46 @@ struct MapContainerView: View {
         .padding(.bottom)
         .ignoresSafeArea(.keyboard)
     }
+
+    #if DEVELOPMENT
+    /// Floating camera button (bottom-left of the map) that triggers the
+    /// Map Maker capture flow. Mirrors the legacy-map-maker UX. Visible
+    /// only in the "Boolder dev" scheme.
+    var mapMakerFab: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Spacer()
+
+                // Stack of currently selected problems for the next topo
+                if !mapMakerTopoEntry.problems.isEmpty {
+                    VStack {
+                        ForEach(mapMakerTopoEntry.problems) { problem in
+                            ProblemCircleView(problem: problem)
+                        }
+                    }
+                    .padding(.bottom, 4)
+                }
+
+                Button {
+                    presentMapMakerSheet = true
+                } label: {
+                    Image(systemName: mapMakerTopoEntry.pickerModeEnabled ? "camera.fill" : "camera")
+                        .padding(12)
+                        .foregroundColor(mapMakerTopoEntry.pickerModeEnabled ? .white : .primary)
+                        .background(mapMakerTopoEntry.pickerModeEnabled ? Color("AppGreen") : Color(UIColor.systemBackground))
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.gray, lineWidth: 0.25))
+                        .shadow(color: Color(UIColor(white: 0.8, alpha: 0.8)), radius: 8)
+                }
+            }
+            .padding(.leading)
+
+            Spacer()
+        }
+        .padding(.bottom)
+        .ignoresSafeArea(.keyboard)
+    }
+    #endif
     
     var fabButtons: some View {
         Group {
