@@ -197,6 +197,13 @@
 		37E260C624674466003BC672 /* Poi.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37E260C524674466003BC672 /* Poi.swift */; };
 		37E42EE1245DB52F00EEBA96 /* CircleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37E42EE0245DB52F00EEBA96 /* CircleView.swift */; };
 		37F9358B250578D000B1CAB2 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 37F9358D250578D000B1CAB2 /* InfoPlist.strings */; };
+		98C0B68E2FA8EAA4001DAC09 /* MapMakerStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98C0B6852FA8EAA4001DAC09 /* MapMakerStore.swift */; };
+		98C0B68F2FA8EAA4001DAC09 /* EditProblemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98C0B6832FA8EAA4001DAC09 /* EditProblemView.swift */; };
+		98C0B6902FA8EAA4001DAC09 /* MapMakerHomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98C0B6842FA8EAA4001DAC09 /* MapMakerHomeView.swift */; };
+		98C0B6912FA8EAA4001DAC09 /* TopoEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98C0B6812FA8EAA4001DAC09 /* TopoEntry.swift */; };
+		98C0B6922FA8EAA4001DAC09 /* NewTopoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98C0B6802FA8EAA4001DAC09 /* NewTopoView.swift */; };
+		98C0B6932FA8EAA4001DAC09 /* LocationFetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98C0B67F2FA8EAA4001DAC09 /* LocationFetcher.swift */; };
+		98C0B6942FA8EAA4001DAC09 /* ImagePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98C0B67E2FA8EAA4001DAC09 /* ImagePickerView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -299,6 +306,13 @@
 		37E42EE0245DB52F00EEBA96 /* CircleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircleView.swift; sourceTree = "<group>"; };
 		37F9358C250578D000B1CAB2 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		37F9358E250578D700B1CAB2 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		98C0B67E2FA8EAA4001DAC09 /* ImagePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagePickerView.swift; sourceTree = "<group>"; };
+		98C0B67F2FA8EAA4001DAC09 /* LocationFetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationFetcher.swift; sourceTree = "<group>"; };
+		98C0B6802FA8EAA4001DAC09 /* NewTopoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewTopoView.swift; sourceTree = "<group>"; };
+		98C0B6812FA8EAA4001DAC09 /* TopoEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopoEntry.swift; sourceTree = "<group>"; };
+		98C0B6832FA8EAA4001DAC09 /* EditProblemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProblemView.swift; sourceTree = "<group>"; };
+		98C0B6842FA8EAA4001DAC09 /* MapMakerHomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapMakerHomeView.swift; sourceTree = "<group>"; };
+		98C0B6852FA8EAA4001DAC09 /* MapMakerStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapMakerStore.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -463,6 +477,7 @@
 		37A8C61D2453263300DC161F = {
 			isa = PBXGroup;
 			children = (
+				98C0B6862FA8EAA4001DAC09 /* Map Maker */,
 				030A0B3B2BEB852800F4E370 /* PrivacyInfo.xcprivacy */,
 				37AEBCF425A5CEA200E0E04F /* Boolder dev.entitlements */,
 				37A8C6282453263300DC161F /* Boolder */,
@@ -560,6 +575,28 @@
 				030AC1AB27BBF53D00AF85E7 /* ActivityView.swift */,
 			);
 			path = "Problem details";
+			sourceTree = "<group>";
+		};
+		98C0B6822FA8EAA4001DAC09 /* Topo */ = {
+			isa = PBXGroup;
+			children = (
+				98C0B67E2FA8EAA4001DAC09 /* ImagePickerView.swift */,
+				98C0B67F2FA8EAA4001DAC09 /* LocationFetcher.swift */,
+				98C0B6802FA8EAA4001DAC09 /* NewTopoView.swift */,
+				98C0B6812FA8EAA4001DAC09 /* TopoEntry.swift */,
+			);
+			path = Topo;
+			sourceTree = "<group>";
+		};
+		98C0B6862FA8EAA4001DAC09 /* Map Maker */ = {
+			isa = PBXGroup;
+			children = (
+				98C0B6822FA8EAA4001DAC09 /* Topo */,
+				98C0B6832FA8EAA4001DAC09 /* EditProblemView.swift */,
+				98C0B6842FA8EAA4001DAC09 /* MapMakerHomeView.swift */,
+				98C0B6852FA8EAA4001DAC09 /* MapMakerStore.swift */,
+			);
+			path = "Boolder/Map Maker";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -753,6 +790,13 @@
 				03C104EA290ACC1A007A94D7 /* MapboxViewController.swift in Sources */,
 				37379919258E619400711EDA /* Poi.swift in Sources */,
 				031EE76D2F1A35E700FCC590 /* GradeLabelView.swift in Sources */,
+				98C0B68E2FA8EAA4001DAC09 /* MapMakerStore.swift in Sources */,
+				98C0B68F2FA8EAA4001DAC09 /* EditProblemView.swift in Sources */,
+				98C0B6902FA8EAA4001DAC09 /* MapMakerHomeView.swift in Sources */,
+				98C0B6912FA8EAA4001DAC09 /* TopoEntry.swift in Sources */,
+				98C0B6922FA8EAA4001DAC09 /* NewTopoView.swift in Sources */,
+				98C0B6932FA8EAA4001DAC09 /* LocationFetcher.swift in Sources */,
+				98C0B6942FA8EAA4001DAC09 /* ImagePickerView.swift in Sources */,
 				3737991A258E619400711EDA /* CircleView.swift in Sources */,
 				038F7F472C3A8CC500AE7028 /* ClusterView.swift in Sources */,
 				031A61BC29EC7CE200B2B46E /* AppState.swift in Sources */,

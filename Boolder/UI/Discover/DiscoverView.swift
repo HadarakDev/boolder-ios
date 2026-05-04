@@ -242,7 +242,7 @@ struct DiscoverView: View {
                             
                             VStack(alignment: .leading) {
                                 Divider()
-                                
+
                                 NavigationLink(destination: SettingsView()) {
                                     HStack {
                                         Image(systemName: "gearshape")
@@ -252,7 +252,19 @@ struct DiscoverView: View {
                                     .font(.body)
                                     .foregroundColor(.primary)
                                 }
-                                
+
+                                Divider()
+
+                                NavigationLink(destination: MapMakerHomeView()) {
+                                    HStack {
+                                        Image(systemName: "camera.viewfinder")
+                                        Text("Map Maker")
+                                        Spacer()
+                                    }
+                                    .font(.body)
+                                    .foregroundColor(.primary)
+                                }
+
                                 Divider()
                             }
                             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
