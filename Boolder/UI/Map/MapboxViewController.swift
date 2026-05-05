@@ -14,9 +14,15 @@ class MapboxViewController: UIViewController {
     var mapView: MapView!
     var delegate: MapBoxViewDelegate?
     var cancelables = Set<AnyCancelable>()
-    
+
     private var currentFilters: Filters?
     private var currentCircuit: Circuit?
+
+    #if DEVELOPMENT
+    // When true, taps on the map only pick problems for the Map Maker's TopoEntry —
+    // no area/cluster/POI selection, no camera move, no problem details.
+    var pickerMode: Bool = false
+    #endif
     
     // Map styles for light and dark mode
     private let lightStyleURI = StyleURI(rawValue: "mapbox://styles/nmondollot/cl95n147u003k15qry7pvfmq2")!
@@ -433,11 +439,18 @@ class MapboxViewController: UIViewController {
     }
     
     func findFeatures(tapPoint: CGPoint) {
-        
+
+        #if DEVELOPMENT
+        if pickerMode {
+            findProblemForPicking(tapPoint: tapPoint)
+            return
+        }
+        #endif
+
         // =================================================
         // Careful: the order of the queries is important
         // =================================================
-        
+
         mapView.mapboxMap.queryRenderedFeatures(
             with: tapPoint,
             options: RenderedQueryOptions(layerIds: ["areas", "areas-hulls"], filter: nil)) { [weak self] result in
@@ -629,7 +642,43 @@ class MapboxViewController: UIViewController {
                 }
             }
     }
-    
+
+    #if DEVELOPMENT
+    // Map Maker picker mode: a tap reports the nearest problem (if any) to the
+    // delegate, which toggles it in TopoEntry.problems. No camera move, no
+    // problem-details sheet, no feature-state highlight.
+    private func findProblemForPicking(tapPoint: CGPoint) {
+        guard mapView.mapboxMap.cameraState.zoom >= 19 else { return }
+
+        // Try the regular problems layer first (32x32 hit rect to match findFeatures)
+        mapView.mapboxMap.queryRenderedFeatures(
+            with: CGRect(x: tapPoint.x - 16, y: tapPoint.y - 16, width: 32, height: 32),
+            options: RenderedQueryOptions(layerIds: ["problems", "problems-names"], filter: nil)
+        ) { [weak self] result in
+            guard let self = self, case .success(let queriedfeatures) = result else { return }
+            let sortedFeatures = getSortedFeaturesByDistance(from: tapPoint, for: queriedfeatures)
+            if let firstId = sortedFeatures.compactMap({ feature -> Int? in
+                if case .number(let id) = feature.properties?["id"] { return Int(id) }
+                return nil
+            }).first {
+                self.delegate?.selectProblem(id: firstId)
+                return
+            }
+            // Fall back to circuit-problems layer
+            self.mapView.mapboxMap.queryRenderedFeatures(
+                with: tapPoint,
+                options: RenderedQueryOptions(layerIds: ["circuit-problems"], filter: nil)
+            ) { [weak self] result in
+                guard let self = self, case .success(let queriedfeatures) = result else { return }
+                if let feature = queriedfeatures.first?.queriedFeature.feature,
+                   case .number(let id) = feature.properties?["id"] {
+                    self.delegate?.selectProblem(id: Int(id))
+                }
+            }
+        }
+    }
+    #endif
+
     func inferAreaFromMap() {
         if(!flyinToSomething) {
             

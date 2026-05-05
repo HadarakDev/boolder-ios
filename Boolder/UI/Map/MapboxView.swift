@@ -18,7 +18,10 @@ import Combine
 
 struct MapboxView: UIViewControllerRepresentable {
     var mapState: MapState
-    
+    #if DEVELOPMENT
+    var topoEntry: TopoEntry? = nil
+    #endif
+
     func makeUIViewController(context: Context) -> MapboxViewController {
         let vc = MapboxViewController()
         vc.delegate = context.coordinator
@@ -27,6 +30,12 @@ struct MapboxView: UIViewControllerRepresentable {
     }
     
     func updateUIViewController(_ vc: MapboxViewController, context: Context) {
+        #if DEVELOPMENT
+        // Wire Map Maker picker mode through to the controller and coordinator.
+        vc.pickerMode = topoEntry?.pickerModeEnabled ?? false
+        context.coordinator.topoEntry = topoEntry
+        #endif
+
         // Pass pre-cached topo problem IDs so setProblemAsSelected never hits SQLite
         if let topoId = mapState.selectedTopo?.id {
             vc.selectedTopoProblemIds = mapState.boulderProblems
@@ -124,7 +133,7 @@ struct MapboxView: UIViewControllerRepresentable {
     class Coordinator: MapBoxViewDelegate {
         var parent: MapboxView
         var viewController: MapboxViewController?
-        
+
         var lastSelectedProblemId: Int = 0
         var lastCenterOnProblemId: Int = 0
         var lastCenterOnAreaId: Int = 0
@@ -135,11 +144,26 @@ struct MapboxView: UIViewControllerRepresentable {
         var lastIsTopoMode: Bool = false
         var lastCenterOnBoulderCount: Int = 0
 
+        #if DEVELOPMENT
+        var topoEntry: TopoEntry?
+        #endif
+
         init(_ parent: MapboxView) {
             self.parent = parent
         }
-        
+
         func selectProblem(id: Int) {
+            #if DEVELOPMENT
+            if let entry = topoEntry, entry.pickerModeEnabled {
+                guard let problem = Problem.load(id: id) else { return }
+                if let idx = entry.problems.firstIndex(where: { $0.id == problem.id }) {
+                    entry.problems.remove(at: idx)
+                } else {
+                    entry.problems.append(problem)
+                }
+                return
+            }
+            #endif
             if let problem = Problem.load(id: id) {
                 parent.mapState.selectProblem(problem, source: .map)
                 parent.mapState.presentProblemDetails = true

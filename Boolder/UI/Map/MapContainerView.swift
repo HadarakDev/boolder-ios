@@ -97,7 +97,12 @@ struct MapContainerView: View {
     
     var mapbox : some View {
         @Bindable var mapState = mapState
-        return MapboxView(mapState: mapState)
+        #if DEVELOPMENT
+        let mapboxView = MapboxView(mapState: mapState, topoEntry: mapMakerTopoEntry)
+        #else
+        let mapboxView = MapboxView(mapState: mapState)
+        #endif
+        return mapboxView
             .modify {
                 if #available(iOS 26, *) {
                     $0.edgesIgnoringSafeArea(.vertical)
