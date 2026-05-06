@@ -47,7 +47,10 @@ enum BoulderDrawSaver {
     static func save(entry: BoulderDrawEntry, store: MapMakerStore = MapMakerStore()) -> URL? {
         guard entry.vertices.count >= 3 else { return nil }
 
-        let timestamp = store.timestamp()
+        // If we're editing an existing record, reuse its filename so Save
+        // overwrites; otherwise mint a fresh timestamp filename.
+        let isOverwrite = entry.editingFilename != nil
+        let baseFilename = entry.editingFilename ?? (store.timestamp() + ".json")
 
         let ring: [[Double]] = entry.vertices.map { v in
             [v.longitude, v.latitude]
@@ -83,13 +86,43 @@ enum BoulderDrawSaver {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
             let data = try encoder.encode(record)
-            let filename = timestamp + ".json"
-            store.save(data: data, directory: "boulders", filename: filename)
+            let filename = baseFilename
+            store.save(data: data, directory: "boulders", filename: filename, overwrite: isOverwrite)
             return URL(fileURLWithPath: filename) // informational; MapMakerStore handles real path
         } catch {
             print("BoulderDrawSaver save error:", error)
             return nil
         }
+    }
+
+    /// Returns vertices stored in the JSON at `<map-maker>/boulders/<filename>`
+    /// in the user's GeoJSON shape. Used to load a saved boulder back into the
+    /// editor.
+    static func loadVertices(filename: String) -> [BoulderVertex]? {
+        let url = directoryURL().appendingPathComponent(filename)
+        guard let data = try? Data(contentsOf: url),
+              let record = try? JSONDecoder().decode(BoulderJson.self, from: data) else {
+            return nil
+        }
+        return record.properties.vertices.map { v in
+            BoulderVertex(
+                latitude: v.latitude,
+                longitude: v.longitude,
+                horizontalAccuracy: v.horizontalAccuracy,
+                sampleCount: v.sampleCount,
+                source: BoulderVertex.VertexSource(rawValue: v.source) ?? .tap
+            )
+        }
+    }
+
+    private static func directoryURL() -> URL {
+        let baseURL: URL = {
+            if let iCloud = FileManager.default.url(forUbiquityContainerIdentifier: nil) {
+                return iCloud.appendingPathComponent("Documents")
+            }
+            return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        }()
+        return baseURL.appendingPathComponent("map-maker").appendingPathComponent("boulders")
     }
 }
 

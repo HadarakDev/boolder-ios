@@ -40,6 +40,7 @@ struct MapboxView: UIViewControllerRepresentable {
         // re-pushed every update so a vertex add/remove driven by the overlay
         // re-renders the polygon on the map without a roundtrip through state.
         vc.drawMode = boulderDrawEntry?.drawingEnabled ?? false
+        vc.currentDrawVertexCount = boulderDrawEntry?.vertices.count ?? 0
         context.coordinator.boulderDrawEntry = boulderDrawEntry
         if let entry = boulderDrawEntry, entry.drawingEnabled {
             let ids = entry.vertices.map { $0.id.uuidString }
@@ -260,6 +261,16 @@ struct MapboxView: UIViewControllerRepresentable {
             guard let entry = boulderDrawEntry, entry.drawingEnabled else { return }
             guard let uuid = UUID(uuidString: vertexId) else { return }
             entry.moveVertex(id: uuid, to: coord)
+        }
+
+        func editSavedBoulder(filename: String) {
+            guard let entry = boulderDrawEntry, entry.drawingEnabled else { return }
+            // Only load if the in-progress polygon is empty so we never wipe
+            // an unsaved drawing.
+            guard entry.vertices.isEmpty else { return }
+            guard let verts = BoulderDrawSaver.loadVertices(filename: filename) else { return }
+            entry.vertices = verts
+            entry.editingFilename = filename
         }
         #endif
     }

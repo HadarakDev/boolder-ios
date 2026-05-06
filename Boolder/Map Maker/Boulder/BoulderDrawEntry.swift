@@ -61,12 +61,16 @@ final class BoulderDrawEntry {
     /// boulders directory and refresh its "saved boulders" overlay. Not
     /// cleared by reset() — it's monotonic.
     var savedBouldersVersion: Int = 0
+    /// Set when the entry was populated from a previously-saved file. Save
+    /// then overwrites that file instead of creating a fresh timestamp.
+    var editingFilename: String?
 
     func reset() {
         drawingEnabled = false
         vertices = []
         comments = ""
         isAveraging = false
+        editingFilename = nil
     }
 
     func removeVertex(id: UUID) {

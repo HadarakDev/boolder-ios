@@ -27,6 +27,11 @@ class MapboxViewController: UIViewController {
     // (Map Maker draw mode). Mutually exclusive with pickerMode at the call site.
     var drawMode: Bool = false
 
+    // Number of vertices currently in the in-progress polygon. Pushed from
+    // MapboxView every update; used by the tap dispatcher to decide whether
+    // a tap on a saved boulder should be interpreted as "load for edit".
+    var currentDrawVertexCount: Int = 0
+
     // Source / layer ids for the in-progress polygon overlay. Created in
     // setupBoulderDrawSourcesAndLayers() and refreshed via updateBoulderDrawGeometry().
     fileprivate let boulderDrawPolygonSourceId = "boulder-draw-polygon"
@@ -871,11 +876,15 @@ class MapboxViewController: UIViewController {
     }
 
     /// Re-reads every saved boulder JSON and pushes the polygons to the
-    /// "saved boulders" source. Called on style-load and after every save.
+    /// "saved boulders" source. Each feature carries a `filename` property
+    /// so a hit-test can map back to the on-disk record for editing.
+    /// Called on style-load and after every save.
     func refreshSavedBoulders() {
-        let rings = BoulderLibrary.loadAllRings()
-        let features: [Feature] = rings.map { ring in
-            Feature(geometry: .polygon(Polygon([ring])))
+        let saved = BoulderLibrary.loadAll()
+        let features: [Feature] = saved.map { b in
+            var f = Feature(geometry: .polygon(Polygon([b.ring])))
+            f.properties = ["filename": .string(b.filename)]
+            return f
         }
         let collection = FeatureCollection(features: features)
         do {
@@ -923,8 +932,11 @@ class MapboxViewController: UIViewController {
         }
     }
 
-    /// Tap dispatch in draw mode: hit-test the existing vertex circles first
-    /// (so a tap on a vertex deletes it), otherwise add a vertex at the tap.
+    /// Tap dispatch in draw mode:
+    ///   1. Hit-test in-progress vertex circles → tap on a vertex deletes it.
+    ///   2. If the in-progress polygon is empty, hit-test saved boulder
+    ///      fills → tap on a saved boulder loads it for editing.
+    ///   3. Otherwise, add a vertex at the tap.
     private func handleBoulderDrawTap(tapPoint: CGPoint) {
         mapView.mapboxMap.queryRenderedFeatures(
             with: CGRect(x: tapPoint.x - 22, y: tapPoint.y - 22, width: 44, height: 44),
@@ -935,6 +947,25 @@ class MapboxViewController: UIViewController {
                let f = features.first?.queriedFeature.feature,
                case .string(let id) = f.properties?["id"] {
                 self.delegate?.removeBoulderVertex(vertexId: id)
+                return
+            }
+            // No vertex hit. If we have nothing being drawn yet, treat a tap
+            // on a saved boulder as a request to edit it.
+            if self.currentDrawVertexCount == 0 {
+                self.mapView.mapboxMap.queryRenderedFeatures(
+                    with: tapPoint,
+                    options: RenderedQueryOptions(layerIds: [self.savedBouldersFillLayerId], filter: nil)
+                ) { [weak self] result in
+                    guard let self = self else { return }
+                    if case .success(let features) = result,
+                       let f = features.first?.queriedFeature.feature,
+                       case .string(let filename) = f.properties?["filename"] {
+                        self.delegate?.editSavedBoulder(filename: filename)
+                        return
+                    }
+                    let coord = self.mapView.mapboxMap.coordinate(for: tapPoint)
+                    self.delegate?.addBoulderVertex(coord: coord)
+                }
                 return
             }
             let coord = self.mapView.mapboxMap.coordinate(for: tapPoint)
@@ -1423,5 +1454,6 @@ protocol MapBoxViewDelegate {
     func addBoulderVertex(coord: CLLocationCoordinate2D)
     func removeBoulderVertex(vertexId: String)
     func moveBoulderVertex(vertexId: String, to coord: CLLocationCoordinate2D)
+    func editSavedBoulder(filename: String)
     #endif
 }

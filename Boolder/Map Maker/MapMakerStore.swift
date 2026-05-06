@@ -11,11 +11,15 @@
 import Foundation
 
 class MapMakerStore {
-    func save(data: Data, directory: String, filename: String) {
+    func save(data: Data, directory: String, filename: String, overwrite: Bool = false) {
         let fileURL = directoryURL(directory: directory).appendingPathComponent(filename)
 
         do {
-            try data.write(to: fileURL, options: [.withoutOverwriting])
+            if overwrite {
+                try data.write(to: fileURL, options: [.atomic])
+            } else {
+                try data.write(to: fileURL, options: [.withoutOverwriting])
+            }
         }
         catch {
             print("MapMakerStore save error:", error)

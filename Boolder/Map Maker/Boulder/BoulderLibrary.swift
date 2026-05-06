@@ -13,10 +13,16 @@
 import Foundation
 import CoreLocation
 
+struct SavedBoulder {
+    var filename: String
+    var ring: [CLLocationCoordinate2D]   // closed ring (first == last)
+}
+
 enum BoulderLibrary {
-    /// Each element is a closed ring: an array of coordinates whose first
-    /// and last entries are equal (GeoJSON Polygon convention).
-    static func loadAllRings() -> [[CLLocationCoordinate2D]] {
+    /// Lists every saved boulder polygon along with the filename it was read
+    /// from (so the map layer can stamp the filename on each feature for
+    /// hit-tested editing).
+    static func loadAll() -> [SavedBoulder] {
         let dir = directoryURL()
         let fm = FileManager.default
         guard let urls = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else {
@@ -24,7 +30,7 @@ enum BoulderLibrary {
         }
         let jsons = urls.filter { $0.pathExtension == "json" }
 
-        var rings: [[CLLocationCoordinate2D]] = []
+        var results: [SavedBoulder] = []
         let decoder = JSONDecoder()
         for url in jsons {
             guard let data = try? Data(contentsOf: url),
@@ -32,16 +38,15 @@ enum BoulderLibrary {
                   let outer = record.geometry.coordinates.first else {
                 continue
             }
-            // Each pair is [lon, lat]; keep the closed ring as Mapbox emits it.
             let ring = outer.compactMap { pair -> CLLocationCoordinate2D? in
                 guard pair.count >= 2 else { return nil }
                 return CLLocationCoordinate2D(latitude: pair[1], longitude: pair[0])
             }
             if ring.count >= 4 { // 3 unique vertices + closing repeat
-                rings.append(ring)
+                results.append(SavedBoulder(filename: url.lastPathComponent, ring: ring))
             }
         }
-        return rings
+        return results
     }
 
     private static func directoryURL() -> URL {
