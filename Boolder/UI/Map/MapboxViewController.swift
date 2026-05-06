@@ -34,6 +34,11 @@ class MapboxViewController: UIViewController {
     fileprivate let boulderDrawFillLayerId = "boulder-draw-fill"
     fileprivate let boulderDrawStrokeLayerId = "boulder-draw-stroke"
     fileprivate let boulderDrawVerticesLayerId = "boulder-draw-vertices"
+    fileprivate let boulderDrawVertexLabelsLayerId = "boulder-draw-vertex-labels"
+
+    // Drag-to-move state. Set on long-press over a vertex; cleared on
+    // gesture end/cancel.
+    fileprivate var draggingVertexId: String?
 
     // Source / layer ids for the persistent "saved boulders" overlay (read
     // from disk on style load and after every save).
@@ -121,6 +126,14 @@ class MapboxViewController: UIViewController {
             self.findFeatures(tapPoint: context.point)
             return true
         })
+
+        #if DEVELOPMENT
+        // Long-press a vertex to drag it. Active only in draw mode.
+        let drag = UILongPressGestureRecognizer(target: self, action: #selector(handleVertexDrag(_:)))
+        drag.minimumPressDuration = 0.3
+        drag.cancelsTouchesInView = false
+        mapView.addGestureRecognizer(drag)
+        #endif
         
         // Important
         // This callback is called on every rendering frame. Don’t use it to modify @State variables, it will lead to excessive body execution and higher CPU consumption.
@@ -748,12 +761,22 @@ class MapboxViewController: UIViewController {
             }
             if !mapView.mapboxMap.layerExists(withId: boulderDrawVerticesLayerId) {
                 var verts = CircleLayer(id: boulderDrawVerticesLayerId, source: boulderDrawVerticesSourceId)
-                verts.circleRadius = .constant(8.0)
+                verts.circleRadius = .constant(10.0)
                 verts.circleColor = .constant(StyleColor(UIColor.white))
                 verts.circleStrokeWidth = .constant(2.5)
                 verts.circleStrokeColor = .constant(StyleColor(strokeColor))
                 verts.circleEmissiveStrength = .constant(0.9)
                 try mapView.mapboxMap.addLayer(verts)
+            }
+            if !mapView.mapboxMap.layerExists(withId: boulderDrawVertexLabelsLayerId) {
+                var labels = SymbolLayer(id: boulderDrawVertexLabelsLayerId, source: boulderDrawVerticesSourceId)
+                labels.textField = .expression(Exp(.toString) { Exp(.get) { "index" } })
+                labels.textSize = .constant(11)
+                labels.textColor = .constant(StyleColor(strokeColor))
+                labels.textAllowOverlap = .constant(true)
+                labels.textIgnorePlacement = .constant(true)
+                labels.textFont = .constant(["Open Sans Semibold", "Arial Unicode MS Bold"])
+                try mapView.mapboxMap.addLayer(labels)
             }
         } catch {
             print("Boulder draw layer setup error:", error)
@@ -766,11 +789,15 @@ class MapboxViewController: UIViewController {
     func updateBoulderDrawGeometry(vertexIds: [String], coordinates: [CLLocationCoordinate2D]) {
         precondition(vertexIds.count == coordinates.count)
 
-        // Vertex points
-        let pointFeatures: [Feature] = zip(vertexIds, coordinates).map { (id, coord) in
+        // Vertex points (index is 1-based for the user-visible label)
+        let pointFeatures: [Feature] = zip(vertexIds, coordinates).enumerated().map { (idx, pair) in
+            let (id, coord) = pair
             var f = Feature(geometry: .point(Point(coord)))
             f.identifier = .string(id)
-            f.properties = ["id": .string(id)]
+            f.properties = [
+                "id": .string(id),
+                "index": .number(Double(idx + 1)),
+            ]
             return f
         }
         let pointsCollection = FeatureCollection(features: pointFeatures)
@@ -858,6 +885,41 @@ class MapboxViewController: UIViewController {
             )
         } catch {
             print("refreshSavedBoulders update error:", error)
+        }
+    }
+
+    /// Long-press over a vertex (in draw mode) starts a drag. Subsequent
+    /// .changed events stream the new coord to the delegate; .ended/.cancelled
+    /// re-enables map panning.
+    @objc private func handleVertexDrag(_ gesture: UILongPressGestureRecognizer) {
+        guard drawMode else { return }
+        let touchPoint = gesture.location(in: mapView)
+
+        switch gesture.state {
+        case .began:
+            mapView.mapboxMap.queryRenderedFeatures(
+                with: CGRect(x: touchPoint.x - 22, y: touchPoint.y - 22, width: 44, height: 44),
+                options: RenderedQueryOptions(layerIds: [boulderDrawVerticesLayerId], filter: nil)
+            ) { [weak self] result in
+                guard let self = self else { return }
+                if case .success(let features) = result,
+                   let f = features.first?.queriedFeature.feature,
+                   case .string(let id) = f.properties?["id"] {
+                    self.draggingVertexId = id
+                    // Disable map pan while dragging so the touch follows the
+                    // finger instead of scrolling the map underneath.
+                    self.mapView.gestures.options.panEnabled = false
+                }
+            }
+        case .changed:
+            guard let id = draggingVertexId else { return }
+            let coord = mapView.mapboxMap.coordinate(for: touchPoint)
+            delegate?.moveBoulderVertex(vertexId: id, to: coord)
+        case .ended, .cancelled, .failed:
+            draggingVertexId = nil
+            mapView.gestures.options.panEnabled = true
+        default:
+            break
         }
     }
 
@@ -1360,5 +1422,6 @@ protocol MapBoxViewDelegate {
     #if DEVELOPMENT
     func addBoulderVertex(coord: CLLocationCoordinate2D)
     func removeBoulderVertex(vertexId: String)
+    func moveBoulderVertex(vertexId: String, to coord: CLLocationCoordinate2D)
     #endif
 }

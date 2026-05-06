@@ -72,6 +72,20 @@ final class BoulderDrawEntry {
     func removeVertex(id: UUID) {
         vertices.removeAll { $0.id == id }
     }
+
+    /// Moves a vertex to a new coordinate (e.g. after a drag). The provenance
+    /// flips to `.tap` and the GPS accuracy is cleared, since the new
+    /// position is hand-placed and no longer reflects a GPS measurement.
+    func moveVertex(id: UUID, to coord: CLLocationCoordinate2D) {
+        guard let idx = vertices.firstIndex(where: { $0.id == id }) else { return }
+        var v = vertices[idx]
+        v.latitude = coord.latitude
+        v.longitude = coord.longitude
+        v.horizontalAccuracy = nil
+        v.sampleCount = 1
+        v.source = .tap
+        vertices[idx] = v
+    }
 }
 
 #endif

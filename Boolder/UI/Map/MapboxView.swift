@@ -255,6 +255,12 @@ struct MapboxView: UIViewControllerRepresentable {
             guard let uuid = UUID(uuidString: vertexId) else { return }
             entry.removeVertex(id: uuid)
         }
+
+        func moveBoulderVertex(vertexId: String, to coord: CLLocationCoordinate2D) {
+            guard let entry = boulderDrawEntry, entry.drawingEnabled else { return }
+            guard let uuid = UUID(uuidString: vertexId) else { return }
+            entry.moveVertex(id: uuid, to: coord)
+        }
         #endif
     }
 }
