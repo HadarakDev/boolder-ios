@@ -58,6 +58,16 @@ class MapboxViewController: UIViewController {
     fileprivate let savedBouldersVerticesSourceId = "saved-boulders-vertices"
     fileprivate let savedBouldersVerticesLayerId = "saved-boulders-vertices"
     fileprivate let savedBouldersVertexLabelsLayerId = "saved-boulders-vertex-labels"
+
+    // When true, taps drop new problems via the delegate (Map Maker
+    // problem-add mode). Mutually exclusive with pickerMode + drawMode at
+    // the call site.
+    var addProblemMode: Bool = false
+
+    // Source / layer ids for saved user-authored problems.
+    fileprivate let savedProblemsSourceId = "saved-problems"
+    fileprivate let savedProblemsCirclesLayerId = "saved-problems-circles"
+    fileprivate let savedProblemsLabelsLayerId = "saved-problems-labels"
     #endif
     
     // Map styles for light and dark mode.
@@ -121,7 +131,9 @@ class MapboxViewController: UIViewController {
             #if DEVELOPMENT
             self.setupBoulderDrawSourcesAndLayers()
             self.setupSavedBouldersSourceAndLayers()
+            self.setupSavedProblemsSourceAndLayers()
             self.refreshSavedBoulders()
+            self.refreshSavedProblems()
             #endif
             if let filters = self.currentFilters {
                 self.applyFilters(filters)
@@ -497,6 +509,10 @@ class MapboxViewController: UIViewController {
         #if DEVELOPMENT
         if drawMode {
             handleBoulderDrawTap(tapPoint: tapPoint)
+            return
+        }
+        if addProblemMode {
+            handleProblemAddTap(tapPoint: tapPoint)
             return
         }
         if pickerMode {
@@ -1043,6 +1059,115 @@ class MapboxViewController: UIViewController {
         }
     }
 
+    // MARK: - Saved problems (Map Maker)
+
+    /// Adds the source + render layers for user-authored problems (white
+    /// circles with the grade as the inline label). Sits above the saved
+    /// boulder layers so the problems are always visible on top of the
+    /// rock outlines.
+    func setupSavedProblemsSourceAndLayers() {
+        do {
+            if !mapView.mapboxMap.sourceExists(withId: savedProblemsSourceId) {
+                var src = GeoJSONSource(id: savedProblemsSourceId)
+                src.data = .featureCollection(FeatureCollection(features: []))
+                try mapView.mapboxMap.addSource(src)
+            }
+
+            let strokeColor = UIColor(resource: .appGreen)
+
+            if !mapView.mapboxMap.layerExists(withId: savedProblemsCirclesLayerId) {
+                var circles = CircleLayer(id: savedProblemsCirclesLayerId, source: savedProblemsSourceId)
+                circles.circleRadius = .expression(
+                    Exp(.interpolate) {
+                        ["linear"]
+                        ["zoom"]
+                        15
+                        4
+                        18
+                        8
+                        22
+                        14
+                    }
+                )
+                circles.circleColor = .constant(StyleColor(UIColor.white))
+                circles.circleStrokeWidth = .constant(2.0)
+                circles.circleStrokeColor = .constant(StyleColor(strokeColor))
+                circles.circleEmissiveStrength = .constant(0.9)
+                try mapView.mapboxMap.addLayer(circles)
+            }
+            if !mapView.mapboxMap.layerExists(withId: savedProblemsLabelsLayerId) {
+                var labels = SymbolLayer(id: savedProblemsLabelsLayerId, source: savedProblemsSourceId)
+                labels.minZoom = 18
+                labels.textField = .expression(Exp(.toString) { Exp(.get) { "grade" } })
+                labels.textSize = .constant(10)
+                labels.textColor = .constant(StyleColor(strokeColor))
+                labels.textAllowOverlap = .constant(true)
+                labels.textIgnorePlacement = .constant(true)
+                labels.textFont = .constant(["Open Sans Semibold", "Arial Unicode MS Bold"])
+                try mapView.mapboxMap.addLayer(labels)
+            }
+        } catch {
+            print("Saved problems layer setup error:", error)
+        }
+    }
+
+    /// Re-reads every saved problem JSON and pushes points to the source.
+    /// Each feature carries `filename`, `name`, `grade` properties.
+    func refreshSavedProblems() {
+        let problems = ProblemLibrary.loadAll()
+        let features: [Feature] = problems.map { p in
+            var f = Feature(geometry: .point(Point(p.coordinate)))
+            f.properties = [
+                "filename": .string(p.filename),
+                "name": .string(p.name),
+                "grade": .string(p.grade),
+            ]
+            return f
+        }
+        let collection = FeatureCollection(features: features)
+        do {
+            try mapView.mapboxMap.updateGeoJSONSource(
+                withId: savedProblemsSourceId,
+                geoJSON: .featureCollection(collection)
+            )
+        } catch {
+            print("refreshSavedProblems update error:", error)
+        }
+    }
+
+    /// Show or hide the saved-problems layers — used while a problem is
+    /// being edited so the user doesn't see two pins (the saved one
+    /// underneath + the pending one being edited).
+    func setSavedProblemsHidden(_ hidden: Bool) {
+        let value = hidden ? "none" : "visible"
+        for id in [savedProblemsCirclesLayerId, savedProblemsLabelsLayerId] {
+            try? mapView.mapboxMap.setLayerProperty(
+                for: id, property: "visibility", value: value
+            )
+        }
+    }
+
+    /// Tap dispatch in problem-add mode:
+    ///   1. If a tap hits an already-saved problem → load it for edit.
+    ///   2. Otherwise → drop a fresh pin at the tap and ask the delegate
+    ///      to open the form sheet.
+    private func handleProblemAddTap(tapPoint: CGPoint) {
+        mapView.mapboxMap.queryRenderedFeatures(
+            with: CGRect(x: tapPoint.x - 18, y: tapPoint.y - 18, width: 36, height: 36),
+            options: RenderedQueryOptions(layerIds: [savedProblemsCirclesLayerId], filter: nil)
+        ) { [weak self] result in
+            guard let self = self else { return }
+            if case .success(let features) = result,
+               let f = features.first?.queriedFeature.feature,
+               case .string(let filename) = f.properties?["filename"] {
+                self.delegate?.editSavedProblem(filename: filename)
+                return
+            }
+            let coord = self.mapView.mapboxMap.coordinate(for: tapPoint)
+            self.delegate?.addProblemAt(coord: coord)
+        }
+    }
+
     /// Tap dispatch in draw mode:
     ///   1. Hit-test in-progress vertex circles → tap on a vertex deletes it.
     ///   2. If the in-progress polygon is empty, hit-test saved boulder
@@ -1567,5 +1692,7 @@ protocol MapBoxViewDelegate {
     func moveBoulderVertex(vertexId: String, to coord: CLLocationCoordinate2D)
     func translateBoulderPolygon(dLat: Double, dLon: Double)
     func editSavedBoulder(filename: String)
+    func addProblemAt(coord: CLLocationCoordinate2D)
+    func editSavedProblem(filename: String)
     #endif
 }

@@ -27,6 +27,7 @@ struct MapContainerView: View {
     @State private var presentMapMakerSheet = false
     @State private var boulderDrawEntry = BoulderDrawEntry()
     @State private var boulderLocationAverager = LocationAverager()
+    @State private var problemEntry = ProblemEntry()
     #endif
 
     var body: some View {
@@ -62,11 +63,17 @@ struct MapContainerView: View {
                 .zIndex(20)
                 .transition(.opacity)
             }
+
+            if problemEntry.addingEnabled && problemEntry.pendingCoord == nil {
+                problemAddBanner
+                    .zIndex(20)
+                    .transition(.opacity)
+            }
             #endif
 
             if mapState.selectedArea == nil {
                 #if DEVELOPMENT
-                if !boulderDrawEntry.drawingEnabled {
+                if !boulderDrawEntry.drawingEnabled && !problemEntry.addingEnabled {
                     searchButtonOverlay
                         .zIndex(20)
                 }
@@ -84,6 +91,17 @@ struct MapContainerView: View {
         #if DEVELOPMENT
         .fullScreenCover(isPresented: $presentMapMakerSheet) {
             NewTopoView(topoEntry: mapMakerTopoEntry)
+        }
+        .sheet(isPresented: Binding(
+            get: { problemEntry.pendingCoord != nil },
+            set: { newValue in if !newValue { problemEntry.clearPending() } }
+        )) {
+            NewProblemSheet(
+                entry: problemEntry,
+                onSave: saveProblem,
+                onCancel: { problemEntry.clearPending() },
+                onDelete: deleteProblem
+            )
         }
         #endif
         .sheet(isPresented: $mapState.presentSearch) {
@@ -122,7 +140,8 @@ struct MapContainerView: View {
         let mapboxView = MapboxView(
             mapState: mapState,
             topoEntry: mapMakerTopoEntry,
-            boulderDrawEntry: boulderDrawEntry
+            boulderDrawEntry: boulderDrawEntry,
+            problemEntry: problemEntry
         )
         #else
         let mapboxView = MapboxView(mapState: mapState)
@@ -388,7 +407,7 @@ struct MapContainerView: View {
                 // while the draw overlay is up (the overlay has its own
                 // Save/Cancel chrome). Tapping it enters draw mode, which
                 // disables picker mode for clarity.
-                if !boulderDrawEntry.drawingEnabled {
+                if !boulderDrawEntry.drawingEnabled && !problemEntry.addingEnabled {
                     Button {
                         startBoulderDraw()
                     } label: {
@@ -396,6 +415,22 @@ struct MapContainerView: View {
                             .padding(12)
                             .foregroundColor(.primary)
                             .background(Color(UIColor.systemBackground))
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.gray, lineWidth: 0.25))
+                            .shadow(color: Color(UIColor(white: 0.8, alpha: 0.8)), radius: 8)
+                    }
+                }
+
+                // Add-problem FAB. Drops a pin on the next map tap and opens
+                // the form sheet.
+                if !boulderDrawEntry.drawingEnabled {
+                    Button {
+                        startProblemAdd()
+                    } label: {
+                        Image(systemName: problemEntry.addingEnabled ? "mappin.circle.fill" : "mappin.circle")
+                            .padding(12)
+                            .foregroundColor(problemEntry.addingEnabled ? .white : .primary)
+                            .background(problemEntry.addingEnabled ? Color("AppGreen") : Color(UIColor.systemBackground))
                             .clipShape(Circle())
                             .overlay(Circle().stroke(Color.gray, lineWidth: 0.25))
                             .shadow(color: Color(UIColor(white: 0.8, alpha: 0.8)), radius: 8)
@@ -445,6 +480,58 @@ struct MapContainerView: View {
             boulderDrawEntry.savedBouldersVersion += 1
         }
         boulderDrawEntry.reset()
+    }
+
+    private func startProblemAdd() {
+        if problemEntry.addingEnabled {
+            // Toggle off if already on (and no in-flight sheet).
+            if problemEntry.pendingCoord == nil {
+                problemEntry.reset()
+            }
+            return
+        }
+        // Mutually exclusive with the other Map Maker modes.
+        mapMakerTopoEntry.pickerModeEnabled = false
+        boulderDrawEntry.reset()
+        problemEntry.reset()
+        problemEntry.addingEnabled = true
+    }
+
+    private func saveProblem() {
+        if ProblemSaver.save(entry: problemEntry) != nil {
+            problemEntry.savedProblemsVersion += 1
+        }
+        problemEntry.clearPending()
+    }
+
+    private func deleteProblem() {
+        if let filename = problemEntry.editingFilename,
+           ProblemSaver.delete(filename: filename) {
+            problemEntry.savedProblemsVersion += 1
+        }
+        problemEntry.clearPending()
+    }
+
+    /// Top banner shown while the user is in problem-add mode but hasn't
+    /// dropped a pin yet. Mirrors BoulderDrawOverlay's chrome.
+    private var problemAddBanner: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button("Cancel") {
+                    problemEntry.reset()
+                }
+                Spacer()
+                Text("Tap on the map to place a problem")
+                    .font(.subheadline.weight(.semibold))
+                Spacer()
+                // Spacer-as-balance so the title stays centered.
+                Text("Cancel").opacity(0)
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial)
+            Spacer()
+        }
     }
     #endif
     

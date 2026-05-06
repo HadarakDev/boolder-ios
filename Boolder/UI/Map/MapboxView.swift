@@ -21,6 +21,7 @@ struct MapboxView: UIViewControllerRepresentable {
     #if DEVELOPMENT
     var topoEntry: TopoEntry? = nil
     var boulderDrawEntry: BoulderDrawEntry? = nil
+    var problemEntry: ProblemEntry? = nil
     #endif
 
     func makeUIViewController(context: Context) -> MapboxViewController {
@@ -63,6 +64,23 @@ struct MapboxView: UIViewControllerRepresentable {
             context.coordinator.lastSavedBouldersVersion = savedVersion
             vc.refreshSavedBoulders()
         }
+
+        // Wire problem-add mode through to the controller and coordinator.
+        vc.addProblemMode = problemEntry?.addingEnabled ?? false
+        context.coordinator.problemEntry = problemEntry
+
+        // Refresh the "saved problems" overlay from disk on monotonic bumps.
+        let savedProblemsVersion = problemEntry?.savedProblemsVersion ?? 0
+        if context.coordinator.lastSavedProblemsVersion != savedProblemsVersion {
+            context.coordinator.lastSavedProblemsVersion = savedProblemsVersion
+            vc.refreshSavedProblems()
+        }
+
+        // Hide the saved-problems pin while it's being edited (avoids the
+        // "two pins on top of each other" effect during edit).
+        let editingProblem = (problemEntry?.editingFilename != nil)
+            && (problemEntry?.pendingCoord != nil)
+        vc.setSavedProblemsHidden(editingProblem)
         #endif
 
         // Pass pre-cached topo problem IDs so setProblemAsSelected never hits SQLite
@@ -176,7 +194,9 @@ struct MapboxView: UIViewControllerRepresentable {
         #if DEVELOPMENT
         var topoEntry: TopoEntry?
         var boulderDrawEntry: BoulderDrawEntry?
+        var problemEntry: ProblemEntry?
         var lastSavedBouldersVersion: Int = -1
+        var lastSavedProblemsVersion: Int = -1
         #endif
 
         init(_ parent: MapboxView) {
@@ -281,6 +301,29 @@ struct MapboxView: UIViewControllerRepresentable {
             guard entry.vertices.isEmpty else { return }
             guard let verts = BoulderDrawSaver.loadVertices(filename: filename) else { return }
             entry.vertices = verts
+            entry.editingFilename = filename
+        }
+
+        func addProblemAt(coord: CLLocationCoordinate2D) {
+            guard let entry = problemEntry, entry.addingEnabled else { return }
+            // Don't open a fresh form on top of an in-flight one.
+            guard entry.pendingCoord == nil else { return }
+            entry.clearPending()
+            entry.pendingCoord = coord
+        }
+
+        func editSavedProblem(filename: String) {
+            guard let entry = problemEntry, entry.addingEnabled else { return }
+            guard entry.pendingCoord == nil else { return }
+            guard let record = ProblemSaver.load(filename: filename),
+                  record.geometry.coordinates.count >= 2 else { return }
+            entry.pendingCoord = CLLocationCoordinate2D(
+                latitude: record.geometry.coordinates[1],
+                longitude: record.geometry.coordinates[0]
+            )
+            entry.name = record.properties.name
+            entry.grade = record.properties.grade
+            entry.comments = record.properties.comments
             entry.editingFilename = filename
         }
         #endif
