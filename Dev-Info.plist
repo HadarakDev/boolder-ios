@@ -27,6 +27,10 @@
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
+	<key>UIFileSharingEnabled</key>
+	<true/>
 	<key>MBXAccessToken</key>
 	<string></string>
 	<key>NSCameraUsageDescription</key>
@@ -35,18 +39,6 @@
 	<string>Your location will be displayed on the map to help you find your way around.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Your location will be displayed on the map to help you find your way around.</string>
-	<key>NSUbiquitousContainers</key>
-	<dict>
-		<key>iCloud.com.hadarak.toposud-dev</key>
-		<dict>
-			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
-			<true/>
-			<key>NSUbiquitousContainerName</key>
-			<string>TopoSud dev</string>
-			<key>NSUbiquitousContainerSupportedFolderLevels</key>
-			<string>Any</string>
-		</dict>
-	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

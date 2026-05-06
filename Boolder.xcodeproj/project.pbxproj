@@ -485,7 +485,7 @@
 		37A8C61D2453263300DC161F = {
 			isa = PBXGroup;
 			children = (
-				98C0B6862FA8EAA4001DAC09 /* Map Maker */,
+				98C0B6862FA8EAA4001DAC09 /* Boolder/Map Maker */,
 				030A0B3B2BEB852800F4E370 /* PrivacyInfo.xcprivacy */,
 				37AEBCF425A5CEA200E0E04F /* Boolder dev.entitlements */,
 				37A8C6282453263300DC161F /* Boolder */,
@@ -596,18 +596,7 @@
 			path = Topo;
 			sourceTree = "<group>";
 		};
-		B0BD0E000000000000000020 /* Boulder */ = {
-			isa = PBXGroup;
-			children = (
-				B0BD0E0000000000000000A1 /* BoulderDrawEntry.swift */,
-				B0BD0E0000000000000000A2 /* LocationAverager.swift */,
-				B0BD0E0000000000000000A3 /* BoulderDrawOverlay.swift */,
-				B0BD0E0000000000000000A4 /* BoulderDrawSaver.swift */,
-			);
-			path = Boulder;
-			sourceTree = "<group>";
-		};
-		98C0B6862FA8EAA4001DAC09 /* Map Maker */ = {
+		98C0B6862FA8EAA4001DAC09 /* Boolder/Map Maker */ = {
 			isa = PBXGroup;
 			children = (
 				98C0B6822FA8EAA4001DAC09 /* Topo */,
@@ -617,6 +606,17 @@
 				98C0B6852FA8EAA4001DAC09 /* MapMakerStore.swift */,
 			);
 			path = "Boolder/Map Maker";
+			sourceTree = "<group>";
+		};
+		B0BD0E000000000000000020 /* Boulder */ = {
+			isa = PBXGroup;
+			children = (
+				B0BD0E0000000000000000A1 /* BoulderDrawEntry.swift */,
+				B0BD0E0000000000000000A2 /* LocationAverager.swift */,
+				B0BD0E0000000000000000A3 /* BoulderDrawOverlay.swift */,
+				B0BD0E0000000000000000A4 /* BoulderDrawSaver.swift */,
+			);
+			path = Boulder;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -1011,6 +1011,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 99;
 				DEVELOPMENT_ASSET_PATHS = "\"Boolder/Preview Content\"";
+				DEVELOPMENT_TEAM = 4D2277XV78;
 				EMBED_ASSET_PACKS_IN_PRODUCT_BUNDLE = NO;
 				ENABLE_ON_DEMAND_RESOURCES = NO;
 				ENABLE_PREVIEWS = YES;
@@ -1038,6 +1039,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 99;
 				DEVELOPMENT_ASSET_PATHS = "\"Boolder/Preview Content\"";
+				DEVELOPMENT_TEAM = 4D2277XV78;
 				EMBED_ASSET_PACKS_IN_PRODUCT_BUNDLE = NO;
 				ENABLE_ON_DEMAND_RESOURCES = NO;
 				ENABLE_PREVIEWS = YES;
