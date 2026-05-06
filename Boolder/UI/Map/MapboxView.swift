@@ -49,6 +49,12 @@ struct MapboxView: UIViewControllerRepresentable {
         } else {
             vc.updateBoulderDrawGeometry(vertexIds: [], coordinates: [])
         }
+        // Hide saved boulders only once the user has started reshaping (any
+        // vertex in the in-progress polygon). With an empty entry we keep
+        // them visible so the user can tap one to load it for edit.
+        let hideSaved = (boulderDrawEntry?.drawingEnabled ?? false)
+            && (boulderDrawEntry?.vertices.isEmpty == false)
+        vc.setSavedBouldersHidden(hideSaved)
 
         // Refresh the "saved boulders" overlay from disk whenever a new
         // boulder is saved (the version counter is monotonic).

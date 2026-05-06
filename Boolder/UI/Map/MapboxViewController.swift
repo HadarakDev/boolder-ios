@@ -914,6 +914,26 @@ class MapboxViewController: UIViewController {
         }
     }
 
+    /// Show or hide every layer that draws saved boulders (polygon fill,
+    /// stroke, vertex circles, vertex labels). Used to prevent visual
+    /// duplication while the user is actively reshaping a polygon — the
+    /// in-progress draw layers replace the saved view.
+    func setSavedBouldersHidden(_ hidden: Bool) {
+        let value = hidden ? "none" : "visible"
+        for id in [
+            savedBouldersFillLayerId,
+            savedBouldersStrokeLayerId,
+            savedBouldersVerticesLayerId,
+            savedBouldersVertexLabelsLayerId,
+        ] {
+            try? mapView.mapboxMap.setLayerProperty(
+                for: id,
+                property: "visibility",
+                value: value
+            )
+        }
+    }
+
     /// Re-reads every saved boulder JSON and pushes the polygons to the
     /// "saved boulders" source. Each feature carries a `filename` property
     /// so a hit-test can map back to the on-disk record for editing.
