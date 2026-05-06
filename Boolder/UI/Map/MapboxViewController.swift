@@ -36,12 +36,17 @@ class MapboxViewController: UIViewController {
     fileprivate let boulderDrawVerticesLayerId = "boulder-draw-vertices"
     #endif
     
-    // Map styles for light and dark mode
+    // Map styles for light and dark mode.
+    // The dark style is currently 404 against any TopoSud-side Mapbox token
+    // (it lives in the upstream `nmondollot` account and is private), so we
+    // fall back to the light style in dark mode too. Replace with our own
+    // styles once TopoSud has its own Mapbox tilesets.
     private let lightStyleURI = StyleURI(rawValue: "mapbox://styles/nmondollot/cl95n147u003k15qry7pvfmq2")!
     private let darkStyleURI = StyleURI(rawValue: "mapbox://styles/nmondollot/cmkea670800a701sdc5n67k3q")!
-    
+
     private var currentStyleURI: StyleURI {
-        traitCollection.userInterfaceStyle == .dark ? darkStyleURI : lightStyleURI
+        // TODO: re-enable dark style once we host our own.
+        return lightStyleURI
     }
     
     override public func viewDidLoad() {
