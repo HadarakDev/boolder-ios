@@ -16,12 +16,14 @@ import CoreLocation
 struct SavedBoulder {
     var filename: String
     var ring: [CLLocationCoordinate2D]   // closed ring (first == last)
+    var vertices: [CLLocationCoordinate2D] // user-placed vertices, in order
 }
 
 enum BoulderLibrary {
     /// Lists every saved boulder polygon along with the filename it was read
     /// from (so the map layer can stamp the filename on each feature for
-    /// hit-tested editing).
+    /// hit-tested editing) and the user-placed vertex coords (so the map
+    /// can show numbered markers on top of saved polygons too).
     static func loadAll() -> [SavedBoulder] {
         let dir = directoryURL()
         let fm = FileManager.default
@@ -42,8 +44,15 @@ enum BoulderLibrary {
                 guard pair.count >= 2 else { return nil }
                 return CLLocationCoordinate2D(latitude: pair[1], longitude: pair[0])
             }
+            let vertices = record.properties.vertices.map { v in
+                CLLocationCoordinate2D(latitude: v.latitude, longitude: v.longitude)
+            }
             if ring.count >= 4 { // 3 unique vertices + closing repeat
-                results.append(SavedBoulder(filename: url.lastPathComponent, ring: ring))
+                results.append(SavedBoulder(
+                    filename: url.lastPathComponent,
+                    ring: ring,
+                    vertices: vertices
+                ))
             }
         }
         return results

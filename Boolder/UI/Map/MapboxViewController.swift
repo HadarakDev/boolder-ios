@@ -50,6 +50,9 @@ class MapboxViewController: UIViewController {
     fileprivate let savedBouldersSourceId = "saved-boulders"
     fileprivate let savedBouldersFillLayerId = "saved-boulders-fill"
     fileprivate let savedBouldersStrokeLayerId = "saved-boulders-stroke"
+    fileprivate let savedBouldersVerticesSourceId = "saved-boulders-vertices"
+    fileprivate let savedBouldersVerticesLayerId = "saved-boulders-vertices"
+    fileprivate let savedBouldersVertexLabelsLayerId = "saved-boulders-vertex-labels"
     #endif
     
     // Map styles for light and dark mode.
@@ -843,6 +846,11 @@ class MapboxViewController: UIViewController {
                 src.data = .featureCollection(FeatureCollection(features: []))
                 try mapView.mapboxMap.addSource(src)
             }
+            if !mapView.mapboxMap.sourceExists(withId: savedBouldersVerticesSourceId) {
+                var src = GeoJSONSource(id: savedBouldersVerticesSourceId)
+                src.data = .featureCollection(FeatureCollection(features: []))
+                try mapView.mapboxMap.addSource(src)
+            }
 
             let strokeColor = UIColor(resource: .appGreen)
 
@@ -870,6 +878,37 @@ class MapboxViewController: UIViewController {
                     try mapView.mapboxMap.addLayer(stroke)
                 }
             }
+            // Vertex circles for saved boulders (shown only when zoomed in
+            // enough to be useful — a low zoom would clutter the map).
+            if !mapView.mapboxMap.layerExists(withId: savedBouldersVerticesLayerId) {
+                var verts = CircleLayer(id: savedBouldersVerticesLayerId, source: savedBouldersVerticesSourceId)
+                verts.minZoom = 17
+                verts.circleRadius = .constant(9.0)
+                verts.circleColor = .constant(StyleColor(UIColor.white))
+                verts.circleStrokeWidth = .constant(2.0)
+                verts.circleStrokeColor = .constant(StyleColor(strokeColor))
+                verts.circleEmissiveStrength = .constant(0.9)
+                if mapView.mapboxMap.layerExists(withId: boulderDrawVerticesLayerId) {
+                    try mapView.mapboxMap.addLayer(verts, layerPosition: .below(boulderDrawVerticesLayerId))
+                } else {
+                    try mapView.mapboxMap.addLayer(verts)
+                }
+            }
+            if !mapView.mapboxMap.layerExists(withId: savedBouldersVertexLabelsLayerId) {
+                var labels = SymbolLayer(id: savedBouldersVertexLabelsLayerId, source: savedBouldersVerticesSourceId)
+                labels.minZoom = 17
+                labels.textField = .expression(Exp(.toString) { Exp(.get) { "index" } })
+                labels.textSize = .constant(11)
+                labels.textColor = .constant(StyleColor(strokeColor))
+                labels.textAllowOverlap = .constant(true)
+                labels.textIgnorePlacement = .constant(true)
+                labels.textFont = .constant(["Open Sans Semibold", "Arial Unicode MS Bold"])
+                if mapView.mapboxMap.layerExists(withId: boulderDrawVertexLabelsLayerId) {
+                    try mapView.mapboxMap.addLayer(labels, layerPosition: .below(boulderDrawVertexLabelsLayerId))
+                } else {
+                    try mapView.mapboxMap.addLayer(labels)
+                }
+            }
         } catch {
             print("Saved boulders layer setup error:", error)
         }
@@ -881,16 +920,37 @@ class MapboxViewController: UIViewController {
     /// Called on style-load and after every save.
     func refreshSavedBoulders() {
         let saved = BoulderLibrary.loadAll()
-        let features: [Feature] = saved.map { b in
+
+        let polyFeatures: [Feature] = saved.map { b in
             var f = Feature(geometry: .polygon(Polygon([b.ring])))
             f.properties = ["filename": .string(b.filename)]
             return f
         }
-        let collection = FeatureCollection(features: features)
+        let polyCollection = FeatureCollection(features: polyFeatures)
+
+        // Each vertex carries its parent filename + 1-based index for the
+        // numbered label. Flatten across all saved boulders into one source.
+        var vertexFeatures: [Feature] = []
+        for b in saved {
+            for (i, coord) in b.vertices.enumerated() {
+                var f = Feature(geometry: .point(Point(coord)))
+                f.properties = [
+                    "filename": .string(b.filename),
+                    "index": .number(Double(i + 1)),
+                ]
+                vertexFeatures.append(f)
+            }
+        }
+        let vertexCollection = FeatureCollection(features: vertexFeatures)
+
         do {
             try mapView.mapboxMap.updateGeoJSONSource(
                 withId: savedBouldersSourceId,
-                geoJSON: .featureCollection(collection)
+                geoJSON: .featureCollection(polyCollection)
+            )
+            try mapView.mapboxMap.updateGeoJSONSource(
+                withId: savedBouldersVerticesSourceId,
+                geoJSON: .featureCollection(vertexCollection)
             )
         } catch {
             print("refreshSavedBoulders update error:", error)
