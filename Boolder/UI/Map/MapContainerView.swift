@@ -56,7 +56,8 @@ struct MapContainerView: View {
                     entry: boulderDrawEntry,
                     averager: boulderLocationAverager,
                     onSave: saveBoulderDraw,
-                    onCancel: cancelBoulderDraw
+                    onCancel: cancelBoulderDraw,
+                    onDelete: deleteBoulderDraw
                 )
                 .zIndex(20)
                 .transition(.opacity)
@@ -435,6 +436,14 @@ struct MapContainerView: View {
     }
 
     private func cancelBoulderDraw() {
+        boulderDrawEntry.reset()
+    }
+
+    private func deleteBoulderDraw() {
+        if let filename = boulderDrawEntry.editingFilename,
+           BoulderDrawSaver.delete(filename: filename) {
+            boulderDrawEntry.savedBouldersVersion += 1
+        }
         boulderDrawEntry.reset()
     }
     #endif

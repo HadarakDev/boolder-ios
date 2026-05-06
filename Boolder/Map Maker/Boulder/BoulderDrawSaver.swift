@@ -95,6 +95,22 @@ enum BoulderDrawSaver {
         }
     }
 
+    /// Deletes the JSON for a saved boulder. Returns true if the file was
+    /// removed (or was already gone), false on a real I/O error.
+    @discardableResult
+    static func delete(filename: String) -> Bool {
+        let url = directoryURL().appendingPathComponent(filename)
+        do {
+            try FileManager.default.removeItem(at: url)
+            return true
+        } catch CocoaError.fileNoSuchFile {
+            return true
+        } catch {
+            print("BoulderDrawSaver delete error:", error)
+            return false
+        }
+    }
+
     /// Returns vertices stored in the JSON at `<map-maker>/boulders/<filename>`
     /// in the user's GeoJSON shape. Used to load a saved boulder back into the
     /// editor.

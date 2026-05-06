@@ -19,6 +19,9 @@ struct BoulderDrawOverlay: View {
     @Bindable var averager: LocationAverager
     var onSave: () -> Void
     var onCancel: () -> Void
+    var onDelete: () -> Void
+
+    @State private var showDeleteConfirm = false
 
     private let averageWindow: TimeInterval = 5.0
 
@@ -44,18 +47,35 @@ struct BoulderDrawOverlay: View {
         .allowsHitTesting(true)
         .onAppear { averager.startStreaming() }
         .onDisappear { averager.stopStreaming() }
+        .alert("Delete this boulder?", isPresented: $showDeleteConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) { onDelete() }
+        } message: {
+            Text("The saved polygon will be removed permanently.")
+        }
     }
 
     // MARK: - Top bar
 
     private var topBar: some View {
-        HStack(alignment: .center) {
+        HStack(alignment: .center, spacing: 12) {
             Button(role: .cancel) {
                 averager.cancelCollection()
                 onCancel()
             } label: {
                 Text("Cancel")
                     .font(.body)
+            }
+
+            // Delete button: only visible when editing an existing polygon.
+            if entry.editingFilename != nil {
+                Button(role: .destructive) {
+                    showDeleteConfirm = true
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.body)
+                }
+                .tint(.red)
             }
 
             Spacer()
