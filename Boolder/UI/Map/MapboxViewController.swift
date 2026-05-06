@@ -34,6 +34,12 @@ class MapboxViewController: UIViewController {
     fileprivate let boulderDrawFillLayerId = "boulder-draw-fill"
     fileprivate let boulderDrawStrokeLayerId = "boulder-draw-stroke"
     fileprivate let boulderDrawVerticesLayerId = "boulder-draw-vertices"
+
+    // Source / layer ids for the persistent "saved boulders" overlay (read
+    // from disk on style load and after every save).
+    fileprivate let savedBouldersSourceId = "saved-boulders"
+    fileprivate let savedBouldersFillLayerId = "saved-boulders-fill"
+    fileprivate let savedBouldersStrokeLayerId = "saved-boulders-stroke"
     #endif
     
     // Map styles for light and dark mode.
@@ -96,6 +102,8 @@ class MapboxViewController: UIViewController {
             self.addLayers()
             #if DEVELOPMENT
             self.setupBoulderDrawSourcesAndLayers()
+            self.setupSavedBouldersSourceAndLayers()
+            self.refreshSavedBoulders()
             #endif
             if let filters = self.currentFilters {
                 self.applyFilters(filters)
@@ -790,6 +798,66 @@ class MapboxViewController: UIViewController {
             )
         } catch {
             print("Boulder draw geometry update error:", error)
+        }
+    }
+
+    /// Adds the source + render layers for the persistent "saved boulders"
+    /// overlay. Sits below the in-progress draw layers so a freshly-saved
+    /// polygon can be redrawn from disk without a visible flicker.
+    func setupSavedBouldersSourceAndLayers() {
+        do {
+            if !mapView.mapboxMap.sourceExists(withId: savedBouldersSourceId) {
+                var src = GeoJSONSource(id: savedBouldersSourceId)
+                src.data = .featureCollection(FeatureCollection(features: []))
+                try mapView.mapboxMap.addSource(src)
+            }
+
+            let strokeColor = UIColor(resource: .appGreen)
+
+            if !mapView.mapboxMap.layerExists(withId: savedBouldersFillLayerId) {
+                var fill = FillLayer(id: savedBouldersFillLayerId, source: savedBouldersSourceId)
+                fill.fillColor = .constant(StyleColor(strokeColor.withAlphaComponent(0.22)))
+                fill.fillOutlineColor = .constant(StyleColor(strokeColor))
+                // Insert below the in-progress fill so the active drawing
+                // visually sits on top.
+                if mapView.mapboxMap.layerExists(withId: boulderDrawFillLayerId) {
+                    try mapView.mapboxMap.addLayer(fill, layerPosition: .below(boulderDrawFillLayerId))
+                } else {
+                    try mapView.mapboxMap.addLayer(fill)
+                }
+            }
+            if !mapView.mapboxMap.layerExists(withId: savedBouldersStrokeLayerId) {
+                var stroke = LineLayer(id: savedBouldersStrokeLayerId, source: savedBouldersSourceId)
+                stroke.lineColor = .constant(StyleColor(strokeColor))
+                stroke.lineWidth = .constant(2.0)
+                stroke.lineCap = .constant(.round)
+                stroke.lineJoin = .constant(.round)
+                if mapView.mapboxMap.layerExists(withId: boulderDrawStrokeLayerId) {
+                    try mapView.mapboxMap.addLayer(stroke, layerPosition: .below(boulderDrawStrokeLayerId))
+                } else {
+                    try mapView.mapboxMap.addLayer(stroke)
+                }
+            }
+        } catch {
+            print("Saved boulders layer setup error:", error)
+        }
+    }
+
+    /// Re-reads every saved boulder JSON and pushes the polygons to the
+    /// "saved boulders" source. Called on style-load and after every save.
+    func refreshSavedBoulders() {
+        let rings = BoulderLibrary.loadAllRings()
+        let features: [Feature] = rings.map { ring in
+            Feature(geometry: .polygon(Polygon([ring])))
+        }
+        let collection = FeatureCollection(features: features)
+        do {
+            try mapView.mapboxMap.updateGeoJSONSource(
+                withId: savedBouldersSourceId,
+                geoJSON: .featureCollection(collection)
+            )
+        } catch {
+            print("refreshSavedBoulders update error:", error)
         }
     }
 

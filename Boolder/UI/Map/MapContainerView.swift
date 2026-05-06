@@ -428,7 +428,9 @@ struct MapContainerView: View {
     }
 
     private func saveBoulderDraw() {
-        BoulderDrawSaver.save(entry: boulderDrawEntry)
+        if BoulderDrawSaver.save(entry: boulderDrawEntry) != nil {
+            boulderDrawEntry.savedBouldersVersion += 1
+        }
         boulderDrawEntry.reset()
     }
 

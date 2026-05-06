@@ -48,6 +48,14 @@ struct MapboxView: UIViewControllerRepresentable {
         } else {
             vc.updateBoulderDrawGeometry(vertexIds: [], coordinates: [])
         }
+
+        // Refresh the "saved boulders" overlay from disk whenever a new
+        // boulder is saved (the version counter is monotonic).
+        let savedVersion = boulderDrawEntry?.savedBouldersVersion ?? 0
+        if context.coordinator.lastSavedBouldersVersion != savedVersion {
+            context.coordinator.lastSavedBouldersVersion = savedVersion
+            vc.refreshSavedBoulders()
+        }
         #endif
 
         // Pass pre-cached topo problem IDs so setProblemAsSelected never hits SQLite
@@ -161,6 +169,7 @@ struct MapboxView: UIViewControllerRepresentable {
         #if DEVELOPMENT
         var topoEntry: TopoEntry?
         var boulderDrawEntry: BoulderDrawEntry?
+        var lastSavedBouldersVersion: Int = -1
         #endif
 
         init(_ parent: MapboxView) {

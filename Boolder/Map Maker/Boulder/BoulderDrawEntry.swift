@@ -57,6 +57,10 @@ final class BoulderDrawEntry {
     /// True while a multi-sample GPS average is in progress (used by the UI
     /// to show a "averaging…" indicator).
     var isAveraging: Bool = false
+    /// Bumped after a successful Save so the map can re-read the on-disk
+    /// boulders directory and refresh its "saved boulders" overlay. Not
+    /// cleared by reset() — it's monotonic.
+    var savedBouldersVersion: Int = 0
 
     func reset() {
         drawingEnabled = false
