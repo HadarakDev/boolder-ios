@@ -22,6 +22,18 @@ class MapboxViewController: UIViewController {
     // When true, taps on the map only pick problems for the Map Maker's TopoEntry —
     // no area/cluster/POI selection, no camera move, no problem details.
     var pickerMode: Bool = false
+
+    // When true, taps add/remove vertices for an in-progress boulder polygon
+    // (Map Maker draw mode). Mutually exclusive with pickerMode at the call site.
+    var drawMode: Bool = false
+
+    // Source / layer ids for the in-progress polygon overlay. Created in
+    // setupBoulderDrawSourcesAndLayers() and refreshed via updateBoulderDrawGeometry().
+    fileprivate let boulderDrawPolygonSourceId = "boulder-draw-polygon"
+    fileprivate let boulderDrawVerticesSourceId = "boulder-draw-vertices"
+    fileprivate let boulderDrawFillLayerId = "boulder-draw-fill"
+    fileprivate let boulderDrawStrokeLayerId = "boulder-draw-stroke"
+    fileprivate let boulderDrawVerticesLayerId = "boulder-draw-vertices"
     #endif
     
     // Map styles for light and dark mode
@@ -77,6 +89,9 @@ class MapboxViewController: UIViewController {
             guard let self = self else { return }
             self.addSources()
             self.addLayers()
+            #if DEVELOPMENT
+            self.setupBoulderDrawSourcesAndLayers()
+            #endif
             if let filters = self.currentFilters {
                 self.applyFilters(filters)
             }
@@ -441,6 +456,10 @@ class MapboxViewController: UIViewController {
     func findFeatures(tapPoint: CGPoint) {
 
         #if DEVELOPMENT
+        if drawMode {
+            handleBoulderDrawTap(tapPoint: tapPoint)
+            return
+        }
         if pickerMode {
             findProblemForPicking(tapPoint: tapPoint)
             return
@@ -675,6 +694,116 @@ class MapboxViewController: UIViewController {
                     self.delegate?.selectProblem(id: Int(id))
                 }
             }
+        }
+    }
+
+    // MARK: - Boulder draw mode (Map Maker)
+
+    /// Adds the empty GeoJSON sources + render layers for the in-progress
+    /// boulder polygon. Called every time the style is (re)loaded so the
+    /// overlay survives dark/light switches and Metal context resets.
+    func setupBoulderDrawSourcesAndLayers() {
+        do {
+            // Sources
+            if !mapView.mapboxMap.sourceExists(withId: boulderDrawPolygonSourceId) {
+                var poly = GeoJSONSource(id: boulderDrawPolygonSourceId)
+                poly.data = .featureCollection(FeatureCollection(features: []))
+                try mapView.mapboxMap.addSource(poly)
+            }
+            if !mapView.mapboxMap.sourceExists(withId: boulderDrawVerticesSourceId) {
+                var verts = GeoJSONSource(id: boulderDrawVerticesSourceId)
+                verts.data = .featureCollection(FeatureCollection(features: []))
+                try mapView.mapboxMap.addSource(verts)
+            }
+
+            // Layers — fill, then stroke, then vertex circles on top.
+            let strokeColor = UIColor(resource: .appGreen)
+
+            if !mapView.mapboxMap.layerExists(withId: boulderDrawFillLayerId) {
+                var fill = FillLayer(id: boulderDrawFillLayerId, source: boulderDrawPolygonSourceId)
+                fill.fillColor = .constant(StyleColor(strokeColor.withAlphaComponent(0.18)))
+                fill.fillOutlineColor = .constant(StyleColor(strokeColor))
+                try mapView.mapboxMap.addLayer(fill)
+            }
+            if !mapView.mapboxMap.layerExists(withId: boulderDrawStrokeLayerId) {
+                var stroke = LineLayer(id: boulderDrawStrokeLayerId, source: boulderDrawPolygonSourceId)
+                stroke.lineColor = .constant(StyleColor(strokeColor))
+                stroke.lineWidth = .constant(2.5)
+                stroke.lineCap = .constant(.round)
+                stroke.lineJoin = .constant(.round)
+                try mapView.mapboxMap.addLayer(stroke)
+            }
+            if !mapView.mapboxMap.layerExists(withId: boulderDrawVerticesLayerId) {
+                var verts = CircleLayer(id: boulderDrawVerticesLayerId, source: boulderDrawVerticesSourceId)
+                verts.circleRadius = .constant(8.0)
+                verts.circleColor = .constant(StyleColor(UIColor.white))
+                verts.circleStrokeWidth = .constant(2.5)
+                verts.circleStrokeColor = .constant(StyleColor(strokeColor))
+                verts.circleEmissiveStrength = .constant(0.9)
+                try mapView.mapboxMap.addLayer(verts)
+            }
+        } catch {
+            print("Boulder draw layer setup error:", error)
+        }
+    }
+
+    /// Refresh the polygon + vertex sources from the current vertex list.
+    /// `vertices` is an array of `(id, coord)` to keep the controller free
+    /// of the BoulderVertex type (which only exists in DEV).
+    func updateBoulderDrawGeometry(vertexIds: [String], coordinates: [CLLocationCoordinate2D]) {
+        precondition(vertexIds.count == coordinates.count)
+
+        // Vertex points
+        let pointFeatures: [Feature] = zip(vertexIds, coordinates).map { (id, coord) in
+            var f = Feature(geometry: .point(Point(coord)))
+            f.identifier = .string(id)
+            f.properties = ["id": .string(id)]
+            return f
+        }
+        let pointsCollection = FeatureCollection(features: pointFeatures)
+
+        // Polygon ring (or polyline if fewer than 3 vertices, point if 1)
+        var polyFeatures: [Feature] = []
+        if coordinates.count >= 3 {
+            let ring = coordinates + [coordinates[0]]
+            polyFeatures = [Feature(geometry: .polygon(Polygon([ring])))]
+        } else if coordinates.count == 2 {
+            polyFeatures = [Feature(geometry: .lineString(LineString(coordinates)))]
+        } else if coordinates.count == 1 {
+            polyFeatures = [Feature(geometry: .point(Point(coordinates[0])))]
+        }
+        let polyCollection = FeatureCollection(features: polyFeatures)
+
+        do {
+            try mapView.mapboxMap.updateGeoJSONSource(
+                withId: boulderDrawPolygonSourceId,
+                geoJSON: .featureCollection(polyCollection)
+            )
+            try mapView.mapboxMap.updateGeoJSONSource(
+                withId: boulderDrawVerticesSourceId,
+                geoJSON: .featureCollection(pointsCollection)
+            )
+        } catch {
+            print("Boulder draw geometry update error:", error)
+        }
+    }
+
+    /// Tap dispatch in draw mode: hit-test the existing vertex circles first
+    /// (so a tap on a vertex deletes it), otherwise add a vertex at the tap.
+    private func handleBoulderDrawTap(tapPoint: CGPoint) {
+        mapView.mapboxMap.queryRenderedFeatures(
+            with: CGRect(x: tapPoint.x - 22, y: tapPoint.y - 22, width: 44, height: 44),
+            options: RenderedQueryOptions(layerIds: [boulderDrawVerticesLayerId], filter: nil)
+        ) { [weak self] result in
+            guard let self = self else { return }
+            if case .success(let features) = result,
+               let f = features.first?.queriedFeature.feature,
+               case .string(let id) = f.properties?["id"] {
+                self.delegate?.removeBoulderVertex(vertexId: id)
+                return
+            }
+            let coord = self.mapView.mapboxMap.coordinate(for: tapPoint)
+            self.delegate?.addBoulderVertex(coord: coord)
         }
     }
     #endif
@@ -1154,4 +1283,9 @@ protocol MapBoxViewDelegate {
     func unselectCircuit()
     func cameraChanged(state: CameraState)
     func dismissProblemDetails()
+
+    #if DEVELOPMENT
+    func addBoulderVertex(coord: CLLocationCoordinate2D)
+    func removeBoulderVertex(vertexId: String)
+    #endif
 }

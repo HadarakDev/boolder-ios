@@ -25,6 +25,8 @@ struct MapContainerView: View {
     #if DEVELOPMENT
     @State private var mapMakerTopoEntry = TopoEntry()
     @State private var presentMapMakerSheet = false
+    @State private var boulderDrawEntry = BoulderDrawEntry()
+    @State private var boulderLocationAverager = LocationAverager()
     #endif
 
     var body: some View {
@@ -48,6 +50,17 @@ struct MapContainerView: View {
             #if DEVELOPMENT
             mapMakerFab
                 .zIndex(10)
+
+            if boulderDrawEntry.drawingEnabled {
+                BoulderDrawOverlay(
+                    entry: boulderDrawEntry,
+                    averager: boulderLocationAverager,
+                    onSave: saveBoulderDraw,
+                    onCancel: cancelBoulderDraw
+                )
+                .zIndex(20)
+                .transition(.opacity)
+            }
             #endif
 
             if mapState.selectedArea == nil {
@@ -98,7 +111,11 @@ struct MapContainerView: View {
     var mapbox : some View {
         @Bindable var mapState = mapState
         #if DEVELOPMENT
-        let mapboxView = MapboxView(mapState: mapState, topoEntry: mapMakerTopoEntry)
+        let mapboxView = MapboxView(
+            mapState: mapState,
+            topoEntry: mapMakerTopoEntry,
+            boulderDrawEntry: boulderDrawEntry
+        )
         #else
         let mapboxView = MapboxView(mapState: mapState)
         #endif
@@ -346,7 +363,7 @@ struct MapContainerView: View {
     /// only in the "Boolder dev" scheme.
     var mapMakerFab: some View {
         HStack {
-            VStack(alignment: .leading) {
+            VStack(alignment: .leading, spacing: 8) {
                 Spacer()
 
                 // Stack of currently selected problems for the next topo
@@ -357,6 +374,24 @@ struct MapContainerView: View {
                         }
                     }
                     .padding(.bottom, 4)
+                }
+
+                // Draw-boulder FAB. Visible whenever the camera FAB is. Hidden
+                // while the draw overlay is up (the overlay has its own
+                // Save/Cancel chrome). Tapping it enters draw mode, which
+                // disables picker mode for clarity.
+                if !boulderDrawEntry.drawingEnabled {
+                    Button {
+                        startBoulderDraw()
+                    } label: {
+                        Image(systemName: "scribble.variable")
+                            .padding(12)
+                            .foregroundColor(.primary)
+                            .background(Color(UIColor.systemBackground))
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.gray, lineWidth: 0.25))
+                            .shadow(color: Color(UIColor(white: 0.8, alpha: 0.8)), radius: 8)
+                    }
                 }
 
                 Button {
@@ -377,6 +412,21 @@ struct MapContainerView: View {
         }
         .padding(.bottom)
         .ignoresSafeArea(.keyboard)
+    }
+
+    private func startBoulderDraw() {
+        // Mutually exclusive with picker mode — turning one on cancels the other.
+        mapMakerTopoEntry.pickerModeEnabled = false
+        boulderDrawEntry.drawingEnabled = true
+    }
+
+    private func saveBoulderDraw() {
+        BoulderDrawSaver.save(entry: boulderDrawEntry)
+        boulderDrawEntry.reset()
+    }
+
+    private func cancelBoulderDraw() {
+        boulderDrawEntry.reset()
     }
     #endif
     

@@ -20,6 +20,7 @@ struct MapboxView: UIViewControllerRepresentable {
     var mapState: MapState
     #if DEVELOPMENT
     var topoEntry: TopoEntry? = nil
+    var boulderDrawEntry: BoulderDrawEntry? = nil
     #endif
 
     func makeUIViewController(context: Context) -> MapboxViewController {
@@ -34,6 +35,19 @@ struct MapboxView: UIViewControllerRepresentable {
         // Wire Map Maker picker mode through to the controller and coordinator.
         vc.pickerMode = topoEntry?.pickerModeEnabled ?? false
         context.coordinator.topoEntry = topoEntry
+
+        // Wire Map Maker boulder-draw mode the same way. Drawing geometry is
+        // re-pushed every update so a vertex add/remove driven by the overlay
+        // re-renders the polygon on the map without a roundtrip through state.
+        vc.drawMode = boulderDrawEntry?.drawingEnabled ?? false
+        context.coordinator.boulderDrawEntry = boulderDrawEntry
+        if let entry = boulderDrawEntry, entry.drawingEnabled {
+            let ids = entry.vertices.map { $0.id.uuidString }
+            let coords = entry.vertices.map { $0.coordinate }
+            vc.updateBoulderDrawGeometry(vertexIds: ids, coordinates: coords)
+        } else {
+            vc.updateBoulderDrawGeometry(vertexIds: [], coordinates: [])
+        }
         #endif
 
         // Pass pre-cached topo problem IDs so setProblemAsSelected never hits SQLite
@@ -146,6 +160,7 @@ struct MapboxView: UIViewControllerRepresentable {
 
         #if DEVELOPMENT
         var topoEntry: TopoEntry?
+        var boulderDrawEntry: BoulderDrawEntry?
         #endif
 
         init(_ parent: MapboxView) {
@@ -209,9 +224,28 @@ struct MapboxView: UIViewControllerRepresentable {
             if parent.mapState.displayCircuitStartButton {
                 parent.mapState.displayCircuitStartButton = false
             }
-            
+
             // TODO: deal with padding
             parent.mapState.updateCameraState(center: state.center, zoom: state.zoom)
         }
+
+        #if DEVELOPMENT
+        func addBoulderVertex(coord: CLLocationCoordinate2D) {
+            guard let entry = boulderDrawEntry, entry.drawingEnabled else { return }
+            entry.vertices.append(BoulderVertex(
+                latitude: coord.latitude,
+                longitude: coord.longitude,
+                horizontalAccuracy: nil,
+                sampleCount: 1,
+                source: .tap
+            ))
+        }
+
+        func removeBoulderVertex(vertexId: String) {
+            guard let entry = boulderDrawEntry, entry.drawingEnabled else { return }
+            guard let uuid = UUID(uuidString: vertexId) else { return }
+            entry.removeVertex(id: uuid)
+        }
+        #endif
     }
 }
