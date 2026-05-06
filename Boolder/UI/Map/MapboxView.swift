@@ -269,6 +269,11 @@ struct MapboxView: UIViewControllerRepresentable {
             entry.moveVertex(id: uuid, to: coord)
         }
 
+        func translateBoulderPolygon(dLat: Double, dLon: Double) {
+            guard let entry = boulderDrawEntry, entry.drawingEnabled else { return }
+            entry.translateAll(dLat: dLat, dLon: dLon)
+        }
+
         func editSavedBoulder(filename: String) {
             guard let entry = boulderDrawEntry, entry.drawingEnabled else { return }
             // Only load if the in-progress polygon is empty so we never wipe

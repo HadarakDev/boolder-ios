@@ -90,6 +90,19 @@ final class BoulderDrawEntry {
         v.source = .tap
         vertices[idx] = v
     }
+
+    /// Translates every vertex by (dLat, dLon). Per-vertex provenance and
+    /// GPS accuracy are preserved — the polygon shape is unchanged, only its
+    /// position shifts.
+    func translateAll(dLat: Double, dLon: Double) {
+        guard !vertices.isEmpty else { return }
+        vertices = vertices.map { v in
+            var copy = v
+            copy.latitude += dLat
+            copy.longitude += dLon
+            return copy
+        }
+    }
 }
 
 #endif

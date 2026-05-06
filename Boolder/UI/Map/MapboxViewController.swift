@@ -45,6 +45,11 @@ class MapboxViewController: UIViewController {
     // gesture end/cancel.
     fileprivate var draggingVertexId: String?
 
+    // Whole-polygon drag state. Set on long-press over the in-progress fill
+    // (and not over any vertex); the touch point is tracked between
+    // .changed events to compute incremental coord deltas.
+    fileprivate var draggingPolygonLastPoint: CGPoint?
+
     // Source / layer ids for the persistent "saved boulders" overlay (read
     // from disk on style load and after every save).
     fileprivate let savedBouldersSourceId = "saved-boulders"
@@ -977,9 +982,11 @@ class MapboxViewController: UIViewController {
         }
     }
 
-    /// Long-press over a vertex (in draw mode) starts a drag. Subsequent
-    /// .changed events stream the new coord to the delegate; .ended/.cancelled
-    /// re-enables map panning.
+    /// Long-press in draw mode starts a drag. Hit-test order:
+    ///   - On a vertex circle → drag that vertex.
+    ///   - On the in-progress fill (off any vertex) → drag the whole polygon.
+    /// .changed events stream the move to the delegate; .ended/.cancelled
+    /// re-enables map panning and clears all state.
     @objc private func handleVertexDrag(_ gesture: UILongPressGestureRecognizer) {
         guard drawMode else { return }
         let touchPoint = gesture.location(in: mapView)
@@ -995,17 +1002,41 @@ class MapboxViewController: UIViewController {
                    let f = features.first?.queriedFeature.feature,
                    case .string(let id) = f.properties?["id"] {
                     self.draggingVertexId = id
-                    // Disable map pan while dragging so the touch follows the
-                    // finger instead of scrolling the map underneath.
                     self.mapView.gestures.options.panEnabled = false
+                    return
+                }
+                // No vertex hit — try the polygon fill for a whole-shape drag.
+                self.mapView.mapboxMap.queryRenderedFeatures(
+                    with: touchPoint,
+                    options: RenderedQueryOptions(layerIds: [self.boulderDrawFillLayerId], filter: nil)
+                ) { [weak self] result in
+                    guard let self = self else { return }
+                    if case .success(let features) = result,
+                       features.first != nil {
+                        self.draggingPolygonLastPoint = touchPoint
+                        self.mapView.gestures.options.panEnabled = false
+                    }
                 }
             }
         case .changed:
-            guard let id = draggingVertexId else { return }
-            let coord = mapView.mapboxMap.coordinate(for: touchPoint)
-            delegate?.moveBoulderVertex(vertexId: id, to: coord)
+            if let id = draggingVertexId {
+                let coord = mapView.mapboxMap.coordinate(for: touchPoint)
+                delegate?.moveBoulderVertex(vertexId: id, to: coord)
+                return
+            }
+            if let last = draggingPolygonLastPoint {
+                let prevCoord = mapView.mapboxMap.coordinate(for: last)
+                let newCoord = mapView.mapboxMap.coordinate(for: touchPoint)
+                let dLat = newCoord.latitude - prevCoord.latitude
+                let dLon = newCoord.longitude - prevCoord.longitude
+                if dLat != 0 || dLon != 0 {
+                    delegate?.translateBoulderPolygon(dLat: dLat, dLon: dLon)
+                    draggingPolygonLastPoint = touchPoint
+                }
+            }
         case .ended, .cancelled, .failed:
             draggingVertexId = nil
+            draggingPolygonLastPoint = nil
             mapView.gestures.options.panEnabled = true
         default:
             break
@@ -1534,6 +1565,7 @@ protocol MapBoxViewDelegate {
     func addBoulderVertex(coord: CLLocationCoordinate2D)
     func removeBoulderVertex(vertexId: String)
     func moveBoulderVertex(vertexId: String, to coord: CLLocationCoordinate2D)
+    func translateBoulderPolygon(dLat: Double, dLon: Double)
     func editSavedBoulder(filename: String)
     #endif
 }
