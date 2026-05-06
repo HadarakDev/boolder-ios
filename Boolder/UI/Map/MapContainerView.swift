@@ -64,8 +64,15 @@ struct MapContainerView: View {
             #endif
 
             if mapState.selectedArea == nil {
+                #if DEVELOPMENT
+                if !boulderDrawEntry.drawingEnabled {
+                    searchButtonOverlay
+                        .zIndex(20)
+                }
+                #else
                 searchButtonOverlay
                     .zIndex(20)
+                #endif
             }
 
             AreaToolbarView()
