@@ -29,6 +29,10 @@ enum ProblemSaver {
         var name: String
         var grade: String
         var comments: String
+        /// Filename of the boulder polygon this problem belongs to (the
+        /// `<timestamp>.json` under map-maker/boulders/). Optional for
+        /// records authored before the linkage was enforced.
+        var boulderId: String?
     }
 
     @discardableResult
@@ -51,7 +55,8 @@ enum ProblemSaver {
                 createdAt: isoFormatter.string(from: Date()),
                 name: entry.name,
                 grade: entry.grade,
-                comments: entry.comments
+                comments: entry.comments,
+                boulderId: entry.boulderId
             )
         )
 

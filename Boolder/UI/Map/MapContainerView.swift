@@ -521,8 +521,13 @@ struct MapContainerView: View {
                     problemEntry.reset()
                 }
                 Spacer()
-                Text("Tap on the map to place a problem")
-                    .font(.subheadline.weight(.semibold))
+                VStack(spacing: 1) {
+                    Text("Tap inside a boulder to place a problem")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Hold a problem to drag it")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
                 Spacer()
                 // Spacer-as-balance so the title stays centered.
                 Text("Cancel").opacity(0)

@@ -304,12 +304,12 @@ struct MapboxView: UIViewControllerRepresentable {
             entry.editingFilename = filename
         }
 
-        func addProblemAt(coord: CLLocationCoordinate2D) {
+        func addProblemAt(coord: CLLocationCoordinate2D, boulderFilename: String) {
             guard let entry = problemEntry, entry.addingEnabled else { return }
-            // Don't open a fresh form on top of an in-flight one.
             guard entry.pendingCoord == nil else { return }
             entry.clearPending()
             entry.pendingCoord = coord
+            entry.boulderId = boulderFilename
         }
 
         func editSavedProblem(filename: String) {
@@ -324,7 +324,34 @@ struct MapboxView: UIViewControllerRepresentable {
             entry.name = record.properties.name
             entry.grade = record.properties.grade
             entry.comments = record.properties.comments
+            entry.boulderId = record.properties.boulderId
             entry.editingFilename = filename
+        }
+
+        func saveProblemMove(filename: String, to coord: CLLocationCoordinate2D, boulderFilename: String) {
+            guard let entry = problemEntry else { return }
+            // Load + mutate + write through the existing save path so the
+            // overwrite logic (atomic + version bump) stays in one place.
+            guard let record = ProblemSaver.load(filename: filename) else {
+                entry.savedProblemsVersion += 1
+                return
+            }
+            entry.pendingCoord = coord
+            entry.name = record.properties.name
+            entry.grade = record.properties.grade
+            entry.comments = record.properties.comments
+            entry.boulderId = boulderFilename
+            entry.editingFilename = filename
+            _ = ProblemSaver.save(entry: entry)
+            entry.clearPending()
+            entry.savedProblemsVersion += 1
+        }
+
+        func revertProblemMove() {
+            // Bumping the version forces refreshSavedProblems() — it
+            // re-pulls from disk and overwrites the in-memory edits the
+            // controller pushed during the drag.
+            problemEntry?.savedProblemsVersion += 1
         }
         #endif
     }

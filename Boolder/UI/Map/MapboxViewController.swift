@@ -50,6 +50,13 @@ class MapboxViewController: UIViewController {
     // .changed events to compute incremental coord deltas.
     fileprivate var draggingPolygonLastPoint: CGPoint?
 
+    // Saved-problem drag (in addProblemMode). The filename is captured on
+    // .began; in-memory cache of all saved problems lets us update the
+    // GeoJSON source on .changed without disk I/O. The committed save
+    // happens on .ended via the delegate.
+    fileprivate var draggingProblemFilename: String?
+    fileprivate var draggingProblemsCache: [SavedProblem] = []
+
     // Source / layer ids for the persistent "saved boulders" overlay (read
     // from disk on style load and after every save).
     fileprivate let savedBouldersSourceId = "saved-boulders"
@@ -998,14 +1005,19 @@ class MapboxViewController: UIViewController {
         }
     }
 
-    /// Long-press in draw mode starts a drag. Hit-test order:
-    ///   - On a vertex circle → drag that vertex.
-    ///   - On the in-progress fill (off any vertex) → drag the whole polygon.
-    /// .changed events stream the move to the delegate; .ended/.cancelled
-    /// re-enables map panning and clears all state.
+    /// Long-press dispatcher.
+    ///   - In drawMode: drag a vertex, or the whole polygon when starting on
+    ///     the fill.
+    ///   - In addProblemMode: drag a saved problem pin.
     @objc private func handleVertexDrag(_ gesture: UILongPressGestureRecognizer) {
-        guard drawMode else { return }
         let touchPoint = gesture.location(in: mapView)
+
+        if addProblemMode {
+            handleProblemDragGesture(touchPoint: touchPoint, state: gesture.state)
+            return
+        }
+
+        guard drawMode else { return }
 
         switch gesture.state {
         case .began:
@@ -1147,10 +1159,101 @@ class MapboxViewController: UIViewController {
         }
     }
 
+    /// Drag a saved problem pin in addProblemMode. The pin follows the
+    /// finger live (in-memory source updates only); on release the move is
+    /// committed via the delegate iff the final point is inside a saved
+    /// boulder, otherwise we revert.
+    private func handleProblemDragGesture(touchPoint: CGPoint, state: UIGestureRecognizer.State) {
+        switch state {
+        case .began:
+            mapView.mapboxMap.queryRenderedFeatures(
+                with: CGRect(x: touchPoint.x - 22, y: touchPoint.y - 22, width: 44, height: 44),
+                options: RenderedQueryOptions(layerIds: [savedProblemsCirclesLayerId], filter: nil)
+            ) { [weak self] result in
+                guard let self = self else { return }
+                guard case .success(let features) = result,
+                      let f = features.first?.queriedFeature.feature,
+                      case .string(let filename) = f.properties?["filename"] else {
+                    return
+                }
+                self.draggingProblemFilename = filename
+                self.draggingProblemsCache = ProblemLibrary.loadAll()
+                self.mapView.gestures.options.panEnabled = false
+            }
+        case .changed:
+            guard let filename = draggingProblemFilename,
+                  let idx = draggingProblemsCache.firstIndex(where: { $0.filename == filename }) else {
+                return
+            }
+            let coord = mapView.mapboxMap.coordinate(for: touchPoint)
+            draggingProblemsCache[idx].coordinate = coord
+            pushSavedProblemsCacheToSource()
+        case .ended:
+            guard let filename = draggingProblemFilename else { return }
+            // Was the release inside a saved polygon?
+            let finalCoord = mapView.mapboxMap.coordinate(for: touchPoint)
+            mapView.mapboxMap.queryRenderedFeatures(
+                with: touchPoint,
+                options: RenderedQueryOptions(layerIds: [savedBouldersFillLayerId], filter: nil)
+            ) { [weak self] result in
+                guard let self = self else { return }
+                self.draggingProblemFilename = nil
+                self.draggingProblemsCache = []
+                self.mapView.gestures.options.panEnabled = true
+
+                if case .success(let features) = result,
+                   let f = features.first?.queriedFeature.feature,
+                   case .string(let boulderFilename) = f.properties?["filename"] {
+                    self.delegate?.saveProblemMove(
+                        filename: filename,
+                        to: finalCoord,
+                        boulderFilename: boulderFilename
+                    )
+                } else {
+                    // Released outside any polygon — revert by re-pulling
+                    // the source from disk.
+                    self.delegate?.revertProblemMove()
+                }
+            }
+        case .cancelled, .failed:
+            draggingProblemFilename = nil
+            draggingProblemsCache = []
+            mapView.gestures.options.panEnabled = true
+            delegate?.revertProblemMove()
+        default:
+            break
+        }
+    }
+
+    /// Push the current `draggingProblemsCache` to the saved-problems source
+    /// (used during a live drag — no disk I/O).
+    private func pushSavedProblemsCacheToSource() {
+        let features: [Feature] = draggingProblemsCache.map { p in
+            var f = Feature(geometry: .point(Point(p.coordinate)))
+            f.properties = [
+                "filename": .string(p.filename),
+                "name": .string(p.name),
+                "grade": .string(p.grade),
+            ]
+            return f
+        }
+        let collection = FeatureCollection(features: features)
+        do {
+            try mapView.mapboxMap.updateGeoJSONSource(
+                withId: savedProblemsSourceId,
+                geoJSON: .featureCollection(collection)
+            )
+        } catch {
+            print("pushSavedProblemsCacheToSource error:", error)
+        }
+    }
+
     /// Tap dispatch in problem-add mode:
     ///   1. If a tap hits an already-saved problem → load it for edit.
-    ///   2. Otherwise → drop a fresh pin at the tap and ask the delegate
-    ///      to open the form sheet.
+    ///   2. Else if the tap is inside a saved boulder polygon → drop a
+    ///      fresh pin and ask the delegate to open the form sheet, with
+    ///      the polygon's filename as the boulder anchor.
+    ///   3. Else → ignore (every problem must live inside a polygon).
     private func handleProblemAddTap(tapPoint: CGPoint) {
         mapView.mapboxMap.queryRenderedFeatures(
             with: CGRect(x: tapPoint.x - 18, y: tapPoint.y - 18, width: 36, height: 36),
@@ -1163,8 +1266,22 @@ class MapboxViewController: UIViewController {
                 self.delegate?.editSavedProblem(filename: filename)
                 return
             }
-            let coord = self.mapView.mapboxMap.coordinate(for: tapPoint)
-            self.delegate?.addProblemAt(coord: coord)
+            // No pin hit — try the saved boulder fill so we can anchor the
+            // new problem to a polygon. Tapping outside any polygon is a
+            // no-op (a hint could be added later via toast/haptic).
+            self.mapView.mapboxMap.queryRenderedFeatures(
+                with: tapPoint,
+                options: RenderedQueryOptions(layerIds: [self.savedBouldersFillLayerId], filter: nil)
+            ) { [weak self] result in
+                guard let self = self else { return }
+                guard case .success(let features) = result,
+                      let f = features.first?.queriedFeature.feature,
+                      case .string(let boulderFilename) = f.properties?["filename"] else {
+                    return
+                }
+                let coord = self.mapView.mapboxMap.coordinate(for: tapPoint)
+                self.delegate?.addProblemAt(coord: coord, boulderFilename: boulderFilename)
+            }
         }
     }
 
@@ -1692,7 +1809,9 @@ protocol MapBoxViewDelegate {
     func moveBoulderVertex(vertexId: String, to coord: CLLocationCoordinate2D)
     func translateBoulderPolygon(dLat: Double, dLon: Double)
     func editSavedBoulder(filename: String)
-    func addProblemAt(coord: CLLocationCoordinate2D)
+    func addProblemAt(coord: CLLocationCoordinate2D, boulderFilename: String)
     func editSavedProblem(filename: String)
+    func saveProblemMove(filename: String, to coord: CLLocationCoordinate2D, boulderFilename: String)
+    func revertProblemMove()
     #endif
 }

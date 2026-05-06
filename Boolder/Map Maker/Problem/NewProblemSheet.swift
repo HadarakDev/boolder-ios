@@ -32,6 +32,15 @@ struct NewProblemSheet: View {
                         .font(.system(.footnote, design: .monospaced))
                         .foregroundColor(.secondary)
                     }
+                    if let boulderId = entry.boulderId {
+                        LabeledContent("Boulder", value: boulderId)
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("Not linked to a boulder")
+                            .font(.footnote)
+                            .foregroundColor(.orange)
+                    }
                 }
 
                 Section("Name") {

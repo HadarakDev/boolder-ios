@@ -25,6 +25,10 @@ final class ProblemEntry {
     var name: String = ""
     var grade: String = "7a"
     var comments: String = ""
+    /// Filename of the boulder polygon this problem is anchored to. Set by
+    /// the controller from a polygon hit-test at the tap point — every
+    /// problem must live inside a saved boulder.
+    var boulderId: String?
     /// Set when the sheet was opened to edit an existing record. Save then
     /// overwrites that file instead of creating a fresh timestamp.
     var editingFilename: String?
@@ -39,6 +43,7 @@ final class ProblemEntry {
         name = ""
         grade = "7a"
         comments = ""
+        boulderId = nil
         editingFilename = nil
     }
 

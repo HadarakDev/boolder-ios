@@ -16,6 +16,7 @@ struct SavedProblem {
     var coordinate: CLLocationCoordinate2D
     var name: String
     var grade: String
+    var boulderId: String?
 }
 
 enum ProblemLibrary {
@@ -41,7 +42,8 @@ enum ProblemLibrary {
                 filename: url.lastPathComponent,
                 coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
                 name: record.properties.name,
-                grade: record.properties.grade
+                grade: record.properties.grade,
+                boulderId: record.properties.boulderId
             ))
         }
         return results
