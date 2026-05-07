@@ -32,6 +32,10 @@ final class ProblemEntry {
     /// Set when the sheet was opened to edit an existing record. Save then
     /// overwrites that file instead of creating a fresh timestamp.
     var editingFilename: String?
+    /// Set when a saved problem is tapped on the map outside of any Map
+    /// Maker mode — drives a read-only details sheet so the user can
+    /// consult the record.
+    var viewingFilename: String?
     /// Bumped after a successful save/delete so the map can re-read the
     /// on-disk problems directory. Monotonic — not cleared by reset().
     var savedProblemsVersion: Int = 0

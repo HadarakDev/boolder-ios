@@ -117,6 +117,36 @@ struct MapContainerView: View {
                 onDelete: deleteProblem
             )
         }
+        .sheet(isPresented: Binding(
+            get: { problemEntry.viewingFilename != nil },
+            set: { newValue in if !newValue { problemEntry.viewingFilename = nil } }
+        )) {
+            if let filename = problemEntry.viewingFilename {
+                CustomProblemDetailsSheet(
+                    filename: filename,
+                    onClose: { problemEntry.viewingFilename = nil },
+                    onEdit: {
+                        // Switch from "view" to "edit" — close the read-only
+                        // sheet, enter add-problem mode and load the record
+                        // into the editor.
+                        problemEntry.viewingFilename = nil
+                        startProblemAdd()
+                        if let record = ProblemSaver.load(filename: filename),
+                           record.geometry.coordinates.count >= 2 {
+                            problemEntry.pendingCoord = CLLocationCoordinate2D(
+                                latitude: record.geometry.coordinates[1],
+                                longitude: record.geometry.coordinates[0]
+                            )
+                            problemEntry.name = record.properties.name
+                            problemEntry.grade = record.properties.grade
+                            problemEntry.comments = record.properties.comments
+                            problemEntry.boulderId = record.properties.boulderId
+                            problemEntry.editingFilename = filename
+                        }
+                    }
+                )
+            }
+        }
         #endif
         .sheet(isPresented: $mapState.presentSearch) {
             SearchSheetView()

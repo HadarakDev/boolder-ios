@@ -437,6 +437,13 @@ struct MapboxView: UIViewControllerRepresentable {
                 entry.customProblems.append(saved)
             }
         }
+
+        func viewCustomProblem(filename: String) {
+            // Tapping a green pin in normal mode (no Map Maker mode active)
+            // pops up a read-only details sheet driven by problemEntry.
+            guard let entry = problemEntry else { return }
+            entry.viewingFilename = filename
+        }
         #endif
     }
 }
