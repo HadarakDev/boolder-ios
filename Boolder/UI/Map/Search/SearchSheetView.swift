@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import CoreLocation
 
 struct SearchSheetView: View {
     @Environment(\.dismiss) private var dismiss
@@ -42,6 +43,16 @@ struct SearchSheetView: View {
                 }
                 else {
                     List {
+                        #if DEVELOPMENT
+                        if !customAreas.isEmpty {
+                            Section(header: Text("TopoSud areas")) {
+                                ForEach(customAreas, id: \.filename) { area in
+                                    customAreaRow(area: area)
+                                }
+                            }
+                        }
+                        #endif
+
                         if !areas.isEmpty {
                             Section(header: Text("search.areas")) {
                                 ForEach(areas, id: \.self) { area in
@@ -49,7 +60,7 @@ struct SearchSheetView: View {
                                 }
                             }
                         }
-                        
+
                         if !problems.isEmpty {
                             Section(header: Text("search.problems")) {
                                 ForEach(problems, id: \.self) { problem in
@@ -91,10 +102,53 @@ struct SearchSheetView: View {
     private var problems: [Problem] {
         Problem.search(query)
     }
-    
+
     private var areas: [Area] {
         Area.search(query)
     }
+
+    #if DEVELOPMENT
+    /// TopoSud-authored areas matching the query (case-insensitive,
+    /// substring). Returned alongside the upstream `areas` so they appear
+    /// at the top of the search results.
+    private var customAreas: [SavedArea] {
+        let needle = query.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !needle.isEmpty else { return [] }
+        return AreaLibrary.loadAll().filter {
+            $0.name.lowercased().contains(needle)
+        }
+    }
+
+    @ViewBuilder
+    private func customAreaRow(area: SavedArea) -> some View {
+        Button {
+            selectCustomArea(area)
+        } label: {
+            HStack {
+                Image(systemName: "square.dashed")
+                    .foregroundColor(.purple)
+                Text(area.name.isEmpty ? area.filename : area.name)
+                    .foregroundColor(.primary)
+            }
+        }
+    }
+
+    private func selectCustomArea(_ area: SavedArea) {
+        dismiss()
+        mapState.clearFilters()
+        mapState.unselectCircuit()
+        // Center the camera on the area's bounding box by feeding the four
+        // corners into the existing "center on boulder" path (which fits
+        // any list of coordinates into the viewport).
+        let corners = [
+            area.southWest,
+            CLLocationCoordinate2D(latitude: area.southWest.latitude, longitude: area.northEast.longitude),
+            area.northEast,
+            CLLocationCoordinate2D(latitude: area.northEast.latitude, longitude: area.southWest.longitude),
+        ]
+        mapState.centerOnBoulder(coordinates: corners)
+    }
+    #endif
     
     @ViewBuilder
     private func searchAreaRow(area: Area) -> some View {
