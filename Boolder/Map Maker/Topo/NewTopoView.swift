@@ -17,6 +17,7 @@ struct NewTopoView: View {
     @Environment(\.managedObjectContext) private var managedObjectContext
 
     @Bindable var topoEntry: TopoEntry
+    @Bindable var problemEntry: ProblemEntry
     @State private var locationFetcher = LocationFetcher()
     @State private var presentImagePicker = false
 
@@ -125,28 +126,104 @@ struct NewTopoView: View {
 
     private var problemsSection: some View {
         Group {
-            if topoEntry.problems.isEmpty {
+            if topoEntry.problems.isEmpty && topoEntry.customProblems.isEmpty {
                 Button {
                     dismiss()  // Return to map to pick problems
                 } label: {
                     HStack { Text("Choose"); Spacer() }
                 }
             } else {
-                VStack {
-                    HStack {
-                        ForEach(topoEntry.problems) { problem in
-                            ProblemCircleView(problem: problem)
+                VStack(alignment: .leading, spacing: 8) {
+                    if !topoEntry.problems.isEmpty {
+                        HStack {
+                            ForEach(topoEntry.problems) { problem in
+                                ProblemCircleView(problem: problem)
+                            }
+                            Spacer()
                         }
-                        Spacer()
+                    }
+                    if !topoEntry.customProblems.isEmpty {
+                        ForEach(topoEntry.customProblems, id: \.filename) { saved in
+                            customProblemRow(saved)
+                        }
                     }
                     Button {
                         topoEntry.problems = []
+                        topoEntry.customProblems = []
                     } label: {
                         HStack { Text("Reset"); Spacer() }
                     }
                 }
             }
         }
+    }
+
+    /// One row per picked custom problem: name + grade + a "📍 GPS" button
+    /// that overwrites the problem's stored coordinate with the current
+    /// best GPS fix from the LocationFetcher (the photographer is
+    /// physically next to the rock at this point — much better than the
+    /// initial tap-pose).
+    private func customProblemRow(_ saved: SavedProblem) -> some View {
+        HStack {
+            Circle()
+                .stroke(Color("AppGreen"), lineWidth: 2)
+                .background(Circle().fill(Color.white))
+                .frame(width: 22, height: 22)
+                .overlay(Text(saved.grade).font(.system(size: 9)))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(saved.name.isEmpty ? "(no name)" : saved.name)
+                    .font(.subheadline)
+                Text(String(format: "%.6f, %.6f", saved.coordinate.latitude, saved.coordinate.longitude))
+                    .font(.caption2.monospacedDigit())
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+            Button {
+                calibrateProblem(saved)
+            } label: {
+                Image(systemName: "location.fill.viewfinder")
+                    .font(.body)
+            }
+            .buttonStyle(.borderless)
+            .disabled(locationFetcher.location == nil)
+        }
+        .padding(.vertical, 4)
+    }
+
+    /// Overwrite a custom problem's stored coordinate with the current GPS
+    /// fix and force the map to refresh from disk.
+    private func calibrateProblem(_ saved: SavedProblem) {
+        guard let loc = locationFetcher.location else { return }
+        guard let record = ProblemSaver.load(filename: saved.filename) else { return }
+        // Re-use the entry as a scratch buffer for ProblemSaver.save (which
+        // reads its fields). We restore the picker state after.
+        let backup = (
+            problemEntry.pendingCoord,
+            problemEntry.name,
+            problemEntry.grade,
+            problemEntry.comments,
+            problemEntry.boulderId,
+            problemEntry.editingFilename
+        )
+        problemEntry.pendingCoord = loc.coordinate
+        problemEntry.name = record.properties.name
+        problemEntry.grade = record.properties.grade
+        problemEntry.comments = record.properties.comments
+        problemEntry.boulderId = record.properties.boulderId
+        problemEntry.editingFilename = saved.filename
+        _ = ProblemSaver.save(entry: problemEntry)
+        problemEntry.pendingCoord = backup.0
+        problemEntry.name = backup.1
+        problemEntry.grade = backup.2
+        problemEntry.comments = backup.3
+        problemEntry.boulderId = backup.4
+        problemEntry.editingFilename = backup.5
+        // Update the in-memory copy in topoEntry too so the row reflects
+        // the new coord without needing to reopen the sheet.
+        if let idx = topoEntry.customProblems.firstIndex(where: { $0.filename == saved.filename }) {
+            topoEntry.customProblems[idx].coordinate = loc.coordinate
+        }
+        problemEntry.savedProblemsVersion += 1
     }
 
     // MARK: - Derived text
@@ -179,6 +256,10 @@ struct NewTopoView: View {
         var heading: Double
         var headingAccuracy: Double
         var problem_ids: [Int]
+        /// Filenames (relative to map-maker/problems/) of the TopoSud-authored
+        /// problems associated with this topo. The pipeline resolves these
+        /// to problem records when ingesting captures.
+        var custom_problem_filenames: [String]
         var comments: String
     }
 
@@ -195,6 +276,7 @@ struct NewTopoView: View {
                 heading: heading.trueHeading,
                 headingAccuracy: heading.headingAccuracy,
                 problem_ids: topoEntry.problems.map { $0.id },
+                custom_problem_filenames: topoEntry.customProblems.map { $0.filename },
                 comments: topoEntry.comments
             )
 

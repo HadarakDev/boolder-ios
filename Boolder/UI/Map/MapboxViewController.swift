@@ -728,32 +728,51 @@ class MapboxViewController: UIViewController {
     // Map Maker picker mode: a tap reports the nearest problem (if any) to the
     // delegate, which toggles it in TopoEntry.problems. No camera move, no
     // problem-details sheet, no feature-state highlight.
+    //
+    // Hit-test order: TopoSud-authored saved problems first (visible at the
+    // typical mapping zoom and rendered above the map), then upstream
+    // Boolder problems, then circuit-problems.
     private func findProblemForPicking(tapPoint: CGPoint) {
-        guard mapView.mapboxMap.cameraState.zoom >= 19 else { return }
-
-        // Try the regular problems layer first (32x32 hit rect to match findFeatures)
+        // Saved (custom) problems first.
         mapView.mapboxMap.queryRenderedFeatures(
-            with: CGRect(x: tapPoint.x - 16, y: tapPoint.y - 16, width: 32, height: 32),
-            options: RenderedQueryOptions(layerIds: ["problems", "problems-names"], filter: nil)
+            with: CGRect(x: tapPoint.x - 18, y: tapPoint.y - 18, width: 36, height: 36),
+            options: RenderedQueryOptions(layerIds: [savedProblemsCirclesLayerId], filter: nil)
         ) { [weak self] result in
-            guard let self = self, case .success(let queriedfeatures) = result else { return }
-            let sortedFeatures = getSortedFeaturesByDistance(from: tapPoint, for: queriedfeatures)
-            if let firstId = sortedFeatures.compactMap({ feature -> Int? in
-                if case .number(let id) = feature.properties?["id"] { return Int(id) }
-                return nil
-            }).first {
-                self.delegate?.selectProblem(id: firstId)
+            guard let self = self else { return }
+            if case .success(let features) = result,
+               let f = features.first?.queriedFeature.feature,
+               case .string(let filename) = f.properties?["filename"] {
+                self.delegate?.selectCustomProblem(filename: filename)
                 return
             }
-            // Fall back to circuit-problems layer
+
+            // Fall through to upstream layers — those tilesets only render
+            // their detailed pins at zoom 19+.
+            guard self.mapView.mapboxMap.cameraState.zoom >= 19 else { return }
+
             self.mapView.mapboxMap.queryRenderedFeatures(
-                with: tapPoint,
-                options: RenderedQueryOptions(layerIds: ["circuit-problems"], filter: nil)
+                with: CGRect(x: tapPoint.x - 16, y: tapPoint.y - 16, width: 32, height: 32),
+                options: RenderedQueryOptions(layerIds: ["problems", "problems-names"], filter: nil)
             ) { [weak self] result in
                 guard let self = self, case .success(let queriedfeatures) = result else { return }
-                if let feature = queriedfeatures.first?.queriedFeature.feature,
-                   case .number(let id) = feature.properties?["id"] {
-                    self.delegate?.selectProblem(id: Int(id))
+                let sortedFeatures = getSortedFeaturesByDistance(from: tapPoint, for: queriedfeatures)
+                if let firstId = sortedFeatures.compactMap({ feature -> Int? in
+                    if case .number(let id) = feature.properties?["id"] { return Int(id) }
+                    return nil
+                }).first {
+                    self.delegate?.selectProblem(id: firstId)
+                    return
+                }
+                // Fall back to circuit-problems layer
+                self.mapView.mapboxMap.queryRenderedFeatures(
+                    with: tapPoint,
+                    options: RenderedQueryOptions(layerIds: ["circuit-problems"], filter: nil)
+                ) { [weak self] result in
+                    guard let self = self, case .success(let queriedfeatures) = result else { return }
+                    if let feature = queriedfeatures.first?.queriedFeature.feature,
+                       case .number(let id) = feature.properties?["id"] {
+                        self.delegate?.selectProblem(id: Int(id))
+                    }
                 }
             }
         }
@@ -1813,5 +1832,6 @@ protocol MapBoxViewDelegate {
     func editSavedProblem(filename: String)
     func saveProblemMove(filename: String, to coord: CLLocationCoordinate2D, boulderFilename: String)
     func revertProblemMove()
+    func selectCustomProblem(filename: String)
     #endif
 }

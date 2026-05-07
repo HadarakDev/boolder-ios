@@ -20,6 +20,10 @@ final class TopoEntry {
     var heading: CLHeading?
     var comments: String = ""
     var problems: [Problem] = []
+    /// Custom (TopoSud-authored) problems picked from the saved-problems
+    /// layer — kept separately from `problems` because they aren't backed
+    /// by SQLite IDs and are referenced by their on-disk filename.
+    var customProblems: [SavedProblem] = []
     var pickerModeEnabled: Bool = false
 
     func reset() {
@@ -28,6 +32,7 @@ final class TopoEntry {
         heading = nil
         comments = ""
         problems = []
+        customProblems = []
         pickerModeEnabled = false
     }
 }

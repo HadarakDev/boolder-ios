@@ -90,7 +90,7 @@ struct MapContainerView: View {
         }
         #if DEVELOPMENT
         .fullScreenCover(isPresented: $presentMapMakerSheet) {
-            NewTopoView(topoEntry: mapMakerTopoEntry)
+            NewTopoView(topoEntry: mapMakerTopoEntry, problemEntry: problemEntry)
         }
         .sheet(isPresented: Binding(
             get: { problemEntry.pendingCoord != nil },
@@ -393,11 +393,23 @@ struct MapContainerView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Spacer()
 
-                // Stack of currently selected problems for the next topo
-                if !mapMakerTopoEntry.problems.isEmpty {
-                    VStack {
+                // Stack of currently selected problems for the next topo —
+                // both upstream (Problem) and TopoSud-authored (SavedProblem).
+                if !mapMakerTopoEntry.problems.isEmpty || !mapMakerTopoEntry.customProblems.isEmpty {
+                    VStack(spacing: 4) {
                         ForEach(mapMakerTopoEntry.problems) { problem in
                             ProblemCircleView(problem: problem)
+                        }
+                        ForEach(mapMakerTopoEntry.customProblems, id: \.filename) { saved in
+                            ZStack {
+                                Circle()
+                                    .stroke(Color("AppGreen"), lineWidth: 2)
+                                    .background(Circle().fill(Color.white))
+                                    .frame(width: 26, height: 26)
+                                Text(saved.grade)
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundColor(.primary)
+                            }
                         }
                     }
                     .padding(.bottom, 4)

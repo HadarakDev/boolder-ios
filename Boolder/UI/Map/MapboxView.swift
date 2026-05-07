@@ -353,6 +353,21 @@ struct MapboxView: UIViewControllerRepresentable {
             // controller pushed during the drag.
             problemEntry?.savedProblemsVersion += 1
         }
+
+        func selectCustomProblem(filename: String) {
+            // Picker mode (camera FAB) toggles a custom problem in the
+            // TopoEntry's customProblems array, mirroring how upstream
+            // problems get toggled in TopoEntry.problems.
+            guard let entry = topoEntry, entry.pickerModeEnabled else { return }
+            // Locate the saved problem by filename via the on-disk library.
+            // Reading on every tap is cheap (a handful of small JSONs).
+            guard let saved = ProblemLibrary.loadAll().first(where: { $0.filename == filename }) else { return }
+            if let idx = entry.customProblems.firstIndex(where: { $0.filename == filename }) {
+                entry.customProblems.remove(at: idx)
+            } else {
+                entry.customProblems.append(saved)
+            }
+        }
         #endif
     }
 }

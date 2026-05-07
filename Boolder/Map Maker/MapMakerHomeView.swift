@@ -12,6 +12,7 @@ import SwiftUI
 
 struct MapMakerHomeView: View {
     @State private var topoEntry = TopoEntry()
+    @State private var problemEntry = ProblemEntry()
     @State private var presentNewTopo = false
     @State private var capturedCount: Int = 0
 
@@ -40,7 +41,7 @@ struct MapMakerHomeView: View {
         .navigationTitle("Map Maker")
         .navigationBarTitleDisplayMode(.inline)
         .fullScreenCover(isPresented: $presentNewTopo, onDismiss: refreshCount) {
-            NewTopoView(topoEntry: topoEntry)
+            NewTopoView(topoEntry: topoEntry, problemEntry: problemEntry)
         }
         .onAppear(perform: refreshCount)
     }
