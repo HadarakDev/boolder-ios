@@ -105,7 +105,10 @@ struct MapContainerView: View {
 
             if mapState.selectedArea == nil {
                 #if DEVELOPMENT
-                if !boulderDrawEntry.drawingEnabled && !problemEntry.addingEnabled && !areaDrawEntry.drawingEnabled {
+                if !boulderDrawEntry.drawingEnabled
+                    && !problemEntry.addingEnabled
+                    && !areaDrawEntry.drawingEnabled
+                    && areaDrawEntry.viewingFilename == nil {
                     searchButtonOverlay
                         .zIndex(20)
                 }
