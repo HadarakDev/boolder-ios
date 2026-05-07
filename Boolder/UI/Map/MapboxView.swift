@@ -22,6 +22,7 @@ struct MapboxView: UIViewControllerRepresentable {
     var topoEntry: TopoEntry? = nil
     var boulderDrawEntry: BoulderDrawEntry? = nil
     var problemEntry: ProblemEntry? = nil
+    var areaDrawEntry: AreaDrawEntry? = nil
     #endif
 
     func makeUIViewController(context: Context) -> MapboxViewController {
@@ -81,6 +82,29 @@ struct MapboxView: UIViewControllerRepresentable {
         let editingProblem = (problemEntry?.editingFilename != nil)
             && (problemEntry?.pendingCoord != nil)
         vc.setSavedProblemsHidden(editingProblem)
+
+        // Wire area-draw mode through.
+        vc.drawAreaMode = areaDrawEntry?.drawingEnabled ?? false
+        vc.currentDrawAreaVertexCount = areaDrawEntry?.vertices.count ?? 0
+        context.coordinator.areaDrawEntry = areaDrawEntry
+        if let entry = areaDrawEntry, entry.drawingEnabled {
+            let ids = entry.vertices.map { $0.id.uuidString }
+            let coords = entry.vertices.map { $0.coordinate }
+            vc.updateAreaDrawGeometry(vertexIds: ids, coordinates: coords)
+        } else {
+            vc.updateAreaDrawGeometry(vertexIds: [], coordinates: [])
+        }
+
+        let savedAreasVersion = areaDrawEntry?.savedAreasVersion ?? 0
+        if context.coordinator.lastSavedAreasVersion != savedAreasVersion {
+            context.coordinator.lastSavedAreasVersion = savedAreasVersion
+            vc.refreshSavedAreas()
+        }
+
+        // Hide saved-areas overlay while editing one (avoids ghost outline).
+        let hideAreas = (areaDrawEntry?.drawingEnabled ?? false)
+            && (areaDrawEntry?.vertices.isEmpty == false)
+        vc.setSavedAreasHidden(hideAreas)
         #endif
 
         // Pass pre-cached topo problem IDs so setProblemAsSelected never hits SQLite
@@ -195,8 +219,10 @@ struct MapboxView: UIViewControllerRepresentable {
         var topoEntry: TopoEntry?
         var boulderDrawEntry: BoulderDrawEntry?
         var problemEntry: ProblemEntry?
+        var areaDrawEntry: AreaDrawEntry?
         var lastSavedBouldersVersion: Int = -1
         var lastSavedProblemsVersion: Int = -1
+        var lastSavedAreasVersion: Int = -1
         #endif
 
         init(_ parent: MapboxView) {
@@ -352,6 +378,45 @@ struct MapboxView: UIViewControllerRepresentable {
             // re-pulls from disk and overwrites the in-memory edits the
             // controller pushed during the drag.
             problemEntry?.savedProblemsVersion += 1
+        }
+
+        func addAreaVertex(coord: CLLocationCoordinate2D) {
+            guard let entry = areaDrawEntry, entry.drawingEnabled else { return }
+            entry.vertices.append(BoulderVertex(
+                latitude: coord.latitude,
+                longitude: coord.longitude,
+                horizontalAccuracy: nil,
+                sampleCount: 1,
+                source: .tap
+            ))
+        }
+
+        func removeAreaVertex(vertexId: String) {
+            guard let entry = areaDrawEntry, entry.drawingEnabled else { return }
+            guard let uuid = UUID(uuidString: vertexId) else { return }
+            entry.removeVertex(id: uuid)
+        }
+
+        func moveAreaVertex(vertexId: String, to coord: CLLocationCoordinate2D) {
+            guard let entry = areaDrawEntry, entry.drawingEnabled else { return }
+            guard let uuid = UUID(uuidString: vertexId) else { return }
+            entry.moveVertex(id: uuid, to: coord)
+        }
+
+        func translateAreaPolygon(dLat: Double, dLon: Double) {
+            guard let entry = areaDrawEntry, entry.drawingEnabled else { return }
+            entry.translateAll(dLat: dLat, dLon: dLon)
+        }
+
+        func editSavedArea(filename: String) {
+            guard let entry = areaDrawEntry, entry.drawingEnabled else { return }
+            guard entry.vertices.isEmpty else { return }
+            guard let verts = AreaDrawSaver.loadVertices(filename: filename),
+                  let record = AreaDrawSaver.load(filename: filename) else { return }
+            entry.vertices = verts
+            entry.name = record.properties.name
+            entry.comments = record.properties.comments
+            entry.editingFilename = filename
         }
 
         func selectCustomProblem(filename: String) {

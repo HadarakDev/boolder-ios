@@ -213,6 +213,10 @@
 		B0BD0E0000000000000000D2 /* ProblemSaver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0BD0E0000000000000000C2 /* ProblemSaver.swift */; };
 		B0BD0E0000000000000000D3 /* ProblemLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0BD0E0000000000000000C3 /* ProblemLibrary.swift */; };
 		B0BD0E0000000000000000D4 /* NewProblemSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0BD0E0000000000000000C4 /* NewProblemSheet.swift */; };
+		B0BD0E0000000000000000F1 /* AreaDrawEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0BD0E0000000000000000E1 /* AreaDrawEntry.swift */; };
+		B0BD0E0000000000000000F2 /* AreaDrawSaver.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0BD0E0000000000000000E2 /* AreaDrawSaver.swift */; };
+		B0BD0E0000000000000000F3 /* AreaLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0BD0E0000000000000000E3 /* AreaLibrary.swift */; };
+		B0BD0E0000000000000000F4 /* AreaDrawOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0BD0E0000000000000000E4 /* AreaDrawOverlay.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -331,6 +335,10 @@
 		B0BD0E0000000000000000C2 /* ProblemSaver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProblemSaver.swift; sourceTree = "<group>"; };
 		B0BD0E0000000000000000C3 /* ProblemLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProblemLibrary.swift; sourceTree = "<group>"; };
 		B0BD0E0000000000000000C4 /* NewProblemSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewProblemSheet.swift; sourceTree = "<group>"; };
+		B0BD0E0000000000000000E1 /* AreaDrawEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreaDrawEntry.swift; sourceTree = "<group>"; };
+		B0BD0E0000000000000000E2 /* AreaDrawSaver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreaDrawSaver.swift; sourceTree = "<group>"; };
+		B0BD0E0000000000000000E3 /* AreaLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreaLibrary.swift; sourceTree = "<group>"; };
+		B0BD0E0000000000000000E4 /* AreaDrawOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreaDrawOverlay.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -612,6 +620,7 @@
 				98C0B6822FA8EAA4001DAC09 /* Topo */,
 				B0BD0E000000000000000020 /* Boulder */,
 				B0BD0E000000000000000030 /* Problem */,
+				B0BD0E000000000000000040 /* Area */,
 				98C0B6832FA8EAA4001DAC09 /* EditProblemView.swift */,
 				98C0B6842FA8EAA4001DAC09 /* MapMakerHomeView.swift */,
 				98C0B6852FA8EAA4001DAC09 /* MapMakerStore.swift */,
@@ -640,6 +649,17 @@
 				B0BD0E0000000000000000C4 /* NewProblemSheet.swift */,
 			);
 			path = Problem;
+			sourceTree = "<group>";
+		};
+		B0BD0E000000000000000040 /* Area */ = {
+			isa = PBXGroup;
+			children = (
+				B0BD0E0000000000000000E1 /* AreaDrawEntry.swift */,
+				B0BD0E0000000000000000E2 /* AreaDrawSaver.swift */,
+				B0BD0E0000000000000000E3 /* AreaLibrary.swift */,
+				B0BD0E0000000000000000E4 /* AreaDrawOverlay.swift */,
+			);
+			path = Area;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -849,6 +869,10 @@
 				B0BD0E0000000000000000D2 /* ProblemSaver.swift in Sources */,
 				B0BD0E0000000000000000D3 /* ProblemLibrary.swift in Sources */,
 				B0BD0E0000000000000000D4 /* NewProblemSheet.swift in Sources */,
+				B0BD0E0000000000000000F1 /* AreaDrawEntry.swift in Sources */,
+				B0BD0E0000000000000000F2 /* AreaDrawSaver.swift in Sources */,
+				B0BD0E0000000000000000F3 /* AreaLibrary.swift in Sources */,
+				B0BD0E0000000000000000F4 /* AreaDrawOverlay.swift in Sources */,
 				3737991A258E619400711EDA /* CircleView.swift in Sources */,
 				038F7F472C3A8CC500AE7028 /* ClusterView.swift in Sources */,
 				031A61BC29EC7CE200B2B46E /* AppState.swift in Sources */,

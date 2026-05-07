@@ -75,6 +75,28 @@ class MapboxViewController: UIViewController {
     fileprivate let savedProblemsSourceId = "saved-problems"
     fileprivate let savedProblemsCirclesLayerId = "saved-problems-circles"
     fileprivate let savedProblemsLabelsLayerId = "saved-problems-labels"
+
+    // Area-draw mode (4th FAB). Same UX as boulder-draw — taps add/remove
+    // vertices, long-press drags — but renders in a different colour and
+    // saves to map-maker/areas/.
+    var drawAreaMode: Bool = false
+    var currentDrawAreaVertexCount: Int = 0
+
+    fileprivate let areaDrawPolygonSourceId = "area-draw-polygon"
+    fileprivate let areaDrawVerticesSourceId = "area-draw-vertices"
+    fileprivate let areaDrawFillLayerId = "area-draw-fill"
+    fileprivate let areaDrawStrokeLayerId = "area-draw-stroke"
+    fileprivate let areaDrawVerticesLayerId = "area-draw-vertices"
+    fileprivate let areaDrawVertexLabelsLayerId = "area-draw-vertex-labels"
+
+    fileprivate let savedAreasSourceId = "saved-areas"
+    fileprivate let savedAreasFillLayerId = "saved-areas-fill"
+    fileprivate let savedAreasStrokeLayerId = "saved-areas-stroke"
+    fileprivate let savedAreasLabelsSourceId = "saved-areas-labels"
+    fileprivate let savedAreasLabelsLayerId = "saved-areas-labels"
+
+    fileprivate var draggingAreaVertexId: String?
+    fileprivate var draggingAreaPolygonLastPoint: CGPoint?
     #endif
     
     // Map styles for light and dark mode.
@@ -139,8 +161,11 @@ class MapboxViewController: UIViewController {
             self.setupBoulderDrawSourcesAndLayers()
             self.setupSavedBouldersSourceAndLayers()
             self.setupSavedProblemsSourceAndLayers()
+            self.setupAreaDrawSourcesAndLayers()
+            self.setupSavedAreasSourceAndLayers()
             self.refreshSavedBoulders()
             self.refreshSavedProblems()
+            self.refreshSavedAreas()
             #endif
             if let filters = self.currentFilters {
                 self.applyFilters(filters)
@@ -516,6 +541,10 @@ class MapboxViewController: UIViewController {
         #if DEVELOPMENT
         if drawMode {
             handleBoulderDrawTap(tapPoint: tapPoint)
+            return
+        }
+        if drawAreaMode {
+            handleAreaDrawTap(tapPoint: tapPoint)
             return
         }
         if addProblemMode {
@@ -1040,6 +1069,10 @@ class MapboxViewController: UIViewController {
             handleProblemDragGesture(touchPoint: touchPoint, state: gesture.state)
             return
         }
+        if drawAreaMode {
+            handleAreaDragGesture(touchPoint: touchPoint, state: gesture.state)
+            return
+        }
 
         guard drawMode else { return }
 
@@ -1183,6 +1216,60 @@ class MapboxViewController: UIViewController {
         }
     }
 
+    /// Long-press drag for the area-draw mode. Mirrors the boulder vertex /
+    /// whole-polygon drag logic, just with the area-specific source/layer IDs
+    /// and delegate methods.
+    private func handleAreaDragGesture(touchPoint: CGPoint, state: UIGestureRecognizer.State) {
+        switch state {
+        case .began:
+            mapView.mapboxMap.queryRenderedFeatures(
+                with: CGRect(x: touchPoint.x - 22, y: touchPoint.y - 22, width: 44, height: 44),
+                options: RenderedQueryOptions(layerIds: [areaDrawVerticesLayerId], filter: nil)
+            ) { [weak self] result in
+                guard let self = self else { return }
+                if case .success(let features) = result,
+                   let f = features.first?.queriedFeature.feature,
+                   case .string(let id) = f.properties?["id"] {
+                    self.draggingAreaVertexId = id
+                    self.mapView.gestures.options.panEnabled = false
+                    return
+                }
+                self.mapView.mapboxMap.queryRenderedFeatures(
+                    with: touchPoint,
+                    options: RenderedQueryOptions(layerIds: [self.areaDrawFillLayerId], filter: nil)
+                ) { [weak self] result in
+                    guard let self = self else { return }
+                    if case .success(let features) = result, features.first != nil {
+                        self.draggingAreaPolygonLastPoint = touchPoint
+                        self.mapView.gestures.options.panEnabled = false
+                    }
+                }
+            }
+        case .changed:
+            if let id = draggingAreaVertexId {
+                let coord = mapView.mapboxMap.coordinate(for: touchPoint)
+                delegate?.moveAreaVertex(vertexId: id, to: coord)
+                return
+            }
+            if let last = draggingAreaPolygonLastPoint {
+                let prevCoord = mapView.mapboxMap.coordinate(for: last)
+                let newCoord = mapView.mapboxMap.coordinate(for: touchPoint)
+                let dLat = newCoord.latitude - prevCoord.latitude
+                let dLon = newCoord.longitude - prevCoord.longitude
+                if dLat != 0 || dLon != 0 {
+                    delegate?.translateAreaPolygon(dLat: dLat, dLon: dLon)
+                    draggingAreaPolygonLastPoint = touchPoint
+                }
+            }
+        case .ended, .cancelled, .failed:
+            draggingAreaVertexId = nil
+            draggingAreaPolygonLastPoint = nil
+            mapView.gestures.options.panEnabled = true
+        default:
+            break
+        }
+    }
+
     /// Drag a saved problem pin in addProblemMode. The pin follows the
     /// finger live (in-memory source updates only); on release the move is
     /// committed via the delegate iff the final point is inside a saved
@@ -1269,6 +1356,232 @@ class MapboxViewController: UIViewController {
             )
         } catch {
             print("pushSavedProblemsCacheToSource error:", error)
+        }
+    }
+
+    // MARK: - Area draw mode (Map Maker)
+
+    fileprivate var areaPolygonColor: UIColor { UIColor.systemPurple }
+
+    func setupAreaDrawSourcesAndLayers() {
+        do {
+            if !mapView.mapboxMap.sourceExists(withId: areaDrawPolygonSourceId) {
+                var poly = GeoJSONSource(id: areaDrawPolygonSourceId)
+                poly.data = .featureCollection(FeatureCollection(features: []))
+                try mapView.mapboxMap.addSource(poly)
+            }
+            if !mapView.mapboxMap.sourceExists(withId: areaDrawVerticesSourceId) {
+                var verts = GeoJSONSource(id: areaDrawVerticesSourceId)
+                verts.data = .featureCollection(FeatureCollection(features: []))
+                try mapView.mapboxMap.addSource(verts)
+            }
+
+            let strokeColor = areaPolygonColor
+
+            if !mapView.mapboxMap.layerExists(withId: areaDrawFillLayerId) {
+                var fill = FillLayer(id: areaDrawFillLayerId, source: areaDrawPolygonSourceId)
+                fill.fillColor = .constant(StyleColor(strokeColor.withAlphaComponent(0.15)))
+                fill.fillOutlineColor = .constant(StyleColor(strokeColor))
+                try mapView.mapboxMap.addLayer(fill)
+            }
+            if !mapView.mapboxMap.layerExists(withId: areaDrawStrokeLayerId) {
+                var stroke = LineLayer(id: areaDrawStrokeLayerId, source: areaDrawPolygonSourceId)
+                stroke.lineColor = .constant(StyleColor(strokeColor))
+                stroke.lineWidth = .constant(2.5)
+                stroke.lineCap = .constant(.round)
+                stroke.lineJoin = .constant(.round)
+                try mapView.mapboxMap.addLayer(stroke)
+            }
+            if !mapView.mapboxMap.layerExists(withId: areaDrawVerticesLayerId) {
+                var verts = CircleLayer(id: areaDrawVerticesLayerId, source: areaDrawVerticesSourceId)
+                verts.circleRadius = .constant(10.0)
+                verts.circleColor = .constant(StyleColor(UIColor.white))
+                verts.circleStrokeWidth = .constant(2.5)
+                verts.circleStrokeColor = .constant(StyleColor(strokeColor))
+                verts.circleEmissiveStrength = .constant(0.9)
+                try mapView.mapboxMap.addLayer(verts)
+            }
+            if !mapView.mapboxMap.layerExists(withId: areaDrawVertexLabelsLayerId) {
+                var labels = SymbolLayer(id: areaDrawVertexLabelsLayerId, source: areaDrawVerticesSourceId)
+                labels.textField = .expression(Exp(.toString) { Exp(.get) { "index" } })
+                labels.textSize = .constant(11)
+                labels.textColor = .constant(StyleColor(strokeColor))
+                labels.textAllowOverlap = .constant(true)
+                labels.textIgnorePlacement = .constant(true)
+                labels.textFont = .constant(["Open Sans Semibold", "Arial Unicode MS Bold"])
+                try mapView.mapboxMap.addLayer(labels)
+            }
+        } catch {
+            print("Area draw layer setup error:", error)
+        }
+    }
+
+    func setupSavedAreasSourceAndLayers() {
+        do {
+            if !mapView.mapboxMap.sourceExists(withId: savedAreasSourceId) {
+                var src = GeoJSONSource(id: savedAreasSourceId)
+                src.data = .featureCollection(FeatureCollection(features: []))
+                try mapView.mapboxMap.addSource(src)
+            }
+            if !mapView.mapboxMap.sourceExists(withId: savedAreasLabelsSourceId) {
+                var src = GeoJSONSource(id: savedAreasLabelsSourceId)
+                src.data = .featureCollection(FeatureCollection(features: []))
+                try mapView.mapboxMap.addSource(src)
+            }
+
+            let strokeColor = areaPolygonColor
+
+            if !mapView.mapboxMap.layerExists(withId: savedAreasFillLayerId) {
+                var fill = FillLayer(id: savedAreasFillLayerId, source: savedAreasSourceId)
+                fill.fillColor = .constant(StyleColor(strokeColor.withAlphaComponent(0.10)))
+                fill.fillOutlineColor = .constant(StyleColor(strokeColor))
+                if mapView.mapboxMap.layerExists(withId: savedBouldersFillLayerId) {
+                    try mapView.mapboxMap.addLayer(fill, layerPosition: .below(savedBouldersFillLayerId))
+                } else {
+                    try mapView.mapboxMap.addLayer(fill)
+                }
+            }
+            if !mapView.mapboxMap.layerExists(withId: savedAreasStrokeLayerId) {
+                var stroke = LineLayer(id: savedAreasStrokeLayerId, source: savedAreasSourceId)
+                stroke.lineColor = .constant(StyleColor(strokeColor))
+                stroke.lineWidth = .constant(1.8)
+                stroke.lineCap = .constant(.round)
+                stroke.lineJoin = .constant(.round)
+                if mapView.mapboxMap.layerExists(withId: savedBouldersStrokeLayerId) {
+                    try mapView.mapboxMap.addLayer(stroke, layerPosition: .below(savedBouldersStrokeLayerId))
+                } else {
+                    try mapView.mapboxMap.addLayer(stroke)
+                }
+            }
+            if !mapView.mapboxMap.layerExists(withId: savedAreasLabelsLayerId) {
+                var labels = SymbolLayer(id: savedAreasLabelsLayerId, source: savedAreasLabelsSourceId)
+                labels.textField = .expression(Exp(.toString) { Exp(.get) { "name" } })
+                labels.textSize = .constant(13)
+                labels.textColor = .constant(StyleColor(strokeColor))
+                labels.textHaloColor = .constant(StyleColor(UIColor.white))
+                labels.textHaloWidth = .constant(1.5)
+                labels.textAllowOverlap = .constant(true)
+                labels.textIgnorePlacement = .constant(true)
+                labels.textFont = .constant(["Open Sans Semibold", "Arial Unicode MS Bold"])
+                try mapView.mapboxMap.addLayer(labels)
+            }
+        } catch {
+            print("Saved areas layer setup error:", error)
+        }
+    }
+
+    func updateAreaDrawGeometry(vertexIds: [String], coordinates: [CLLocationCoordinate2D]) {
+        precondition(vertexIds.count == coordinates.count)
+        let pointFeatures: [Feature] = zip(vertexIds, coordinates).enumerated().map { (idx, pair) in
+            let (id, coord) = pair
+            var f = Feature(geometry: .point(Point(coord)))
+            f.identifier = .string(id)
+            f.properties = [
+                "id": .string(id),
+                "index": .number(Double(idx + 1)),
+            ]
+            return f
+        }
+        let pointsCollection = FeatureCollection(features: pointFeatures)
+
+        var polyFeatures: [Feature] = []
+        if coordinates.count >= 3 {
+            let ring = coordinates + [coordinates[0]]
+            polyFeatures = [Feature(geometry: .polygon(Polygon([ring])))]
+        } else if coordinates.count == 2 {
+            polyFeatures = [Feature(geometry: .lineString(LineString(coordinates)))]
+        } else if coordinates.count == 1 {
+            polyFeatures = [Feature(geometry: .point(Point(coordinates[0])))]
+        }
+        let polyCollection = FeatureCollection(features: polyFeatures)
+
+        do {
+            try mapView.mapboxMap.updateGeoJSONSource(
+                withId: areaDrawPolygonSourceId,
+                geoJSON: .featureCollection(polyCollection)
+            )
+            try mapView.mapboxMap.updateGeoJSONSource(
+                withId: areaDrawVerticesSourceId,
+                geoJSON: .featureCollection(pointsCollection)
+            )
+        } catch {
+            print("Area draw geometry update error:", error)
+        }
+    }
+
+    func refreshSavedAreas() {
+        let areas = AreaLibrary.loadAll()
+
+        let polyFeatures: [Feature] = areas.map { a in
+            var f = Feature(geometry: .polygon(Polygon([a.ring])))
+            f.properties = [
+                "filename": .string(a.filename),
+                "name": .string(a.name),
+            ]
+            return f
+        }
+        let labelFeatures: [Feature] = areas.map { a in
+            var f = Feature(geometry: .point(Point(a.centroid)))
+            f.properties = [
+                "filename": .string(a.filename),
+                "name": .string(a.name),
+            ]
+            return f
+        }
+
+        do {
+            try mapView.mapboxMap.updateGeoJSONSource(
+                withId: savedAreasSourceId,
+                geoJSON: .featureCollection(FeatureCollection(features: polyFeatures))
+            )
+            try mapView.mapboxMap.updateGeoJSONSource(
+                withId: savedAreasLabelsSourceId,
+                geoJSON: .featureCollection(FeatureCollection(features: labelFeatures))
+            )
+        } catch {
+            print("refreshSavedAreas update error:", error)
+        }
+    }
+
+    func setSavedAreasHidden(_ hidden: Bool) {
+        let value = hidden ? "none" : "visible"
+        for id in [savedAreasFillLayerId, savedAreasStrokeLayerId, savedAreasLabelsLayerId] {
+            try? mapView.mapboxMap.setLayerProperty(for: id, property: "visibility", value: value)
+        }
+    }
+
+    private func handleAreaDrawTap(tapPoint: CGPoint) {
+        mapView.mapboxMap.queryRenderedFeatures(
+            with: CGRect(x: tapPoint.x - 22, y: tapPoint.y - 22, width: 44, height: 44),
+            options: RenderedQueryOptions(layerIds: [areaDrawVerticesLayerId], filter: nil)
+        ) { [weak self] result in
+            guard let self = self else { return }
+            if case .success(let features) = result,
+               let f = features.first?.queriedFeature.feature,
+               case .string(let id) = f.properties?["id"] {
+                self.delegate?.removeAreaVertex(vertexId: id)
+                return
+            }
+            if self.currentDrawAreaVertexCount == 0 {
+                // Empty draw → tap on a saved area loads it for edit.
+                self.mapView.mapboxMap.queryRenderedFeatures(
+                    with: tapPoint,
+                    options: RenderedQueryOptions(layerIds: [self.savedAreasFillLayerId], filter: nil)
+                ) { [weak self] result in
+                    guard let self = self else { return }
+                    if case .success(let features) = result,
+                       let f = features.first?.queriedFeature.feature,
+                       case .string(let filename) = f.properties?["filename"] {
+                        self.delegate?.editSavedArea(filename: filename)
+                        return
+                    }
+                    let coord = self.mapView.mapboxMap.coordinate(for: tapPoint)
+                    self.delegate?.addAreaVertex(coord: coord)
+                }
+                return
+            }
+            let coord = self.mapView.mapboxMap.coordinate(for: tapPoint)
+            self.delegate?.addAreaVertex(coord: coord)
         }
     }
 
@@ -1838,5 +2151,10 @@ protocol MapBoxViewDelegate {
     func saveProblemMove(filename: String, to coord: CLLocationCoordinate2D, boulderFilename: String)
     func revertProblemMove()
     func selectCustomProblem(filename: String)
+    func addAreaVertex(coord: CLLocationCoordinate2D)
+    func removeAreaVertex(vertexId: String)
+    func moveAreaVertex(vertexId: String, to coord: CLLocationCoordinate2D)
+    func translateAreaPolygon(dLat: Double, dLon: Double)
+    func editSavedArea(filename: String)
     #endif
 }

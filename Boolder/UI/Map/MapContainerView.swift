@@ -28,6 +28,8 @@ struct MapContainerView: View {
     @State private var boulderDrawEntry = BoulderDrawEntry()
     @State private var boulderLocationAverager = LocationAverager()
     @State private var problemEntry = ProblemEntry()
+    @State private var areaDrawEntry = AreaDrawEntry()
+    @State private var areaLocationAverager = LocationAverager()
     #endif
 
     var body: some View {
@@ -69,11 +71,23 @@ struct MapContainerView: View {
                     .zIndex(20)
                     .transition(.opacity)
             }
+
+            if areaDrawEntry.drawingEnabled {
+                AreaDrawOverlay(
+                    entry: areaDrawEntry,
+                    averager: areaLocationAverager,
+                    onSave: saveAreaDraw,
+                    onCancel: cancelAreaDraw,
+                    onDelete: deleteAreaDraw
+                )
+                .zIndex(20)
+                .transition(.opacity)
+            }
             #endif
 
             if mapState.selectedArea == nil {
                 #if DEVELOPMENT
-                if !boulderDrawEntry.drawingEnabled && !problemEntry.addingEnabled {
+                if !boulderDrawEntry.drawingEnabled && !problemEntry.addingEnabled && !areaDrawEntry.drawingEnabled {
                     searchButtonOverlay
                         .zIndex(20)
                 }
@@ -141,7 +155,8 @@ struct MapContainerView: View {
             mapState: mapState,
             topoEntry: mapMakerTopoEntry,
             boulderDrawEntry: boulderDrawEntry,
-            problemEntry: problemEntry
+            problemEntry: problemEntry,
+            areaDrawEntry: areaDrawEntry
         )
         #else
         let mapboxView = MapboxView(mapState: mapState)
@@ -435,7 +450,7 @@ struct MapContainerView: View {
 
                 // Add-problem FAB. Drops a pin on the next map tap and opens
                 // the form sheet.
-                if !boulderDrawEntry.drawingEnabled {
+                if !boulderDrawEntry.drawingEnabled && !areaDrawEntry.drawingEnabled {
                     Button {
                         startProblemAdd()
                     } label: {
@@ -443,6 +458,22 @@ struct MapContainerView: View {
                             .padding(12)
                             .foregroundColor(problemEntry.addingEnabled ? .white : .primary)
                             .background(problemEntry.addingEnabled ? Color("AppGreen") : Color(UIColor.systemBackground))
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.gray, lineWidth: 0.25))
+                            .shadow(color: Color(UIColor(white: 0.8, alpha: 0.8)), radius: 8)
+                    }
+                }
+
+                // Draw-area FAB. Same UX as the boulder draw, but for the
+                // larger sector polygons. Hidden while another mode is active.
+                if !boulderDrawEntry.drawingEnabled && !problemEntry.addingEnabled {
+                    Button {
+                        startAreaDraw()
+                    } label: {
+                        Image(systemName: areaDrawEntry.drawingEnabled ? "square.dashed.inset.filled" : "square.dashed")
+                            .padding(12)
+                            .foregroundColor(areaDrawEntry.drawingEnabled ? .white : .primary)
+                            .background(areaDrawEntry.drawingEnabled ? Color.purple : Color(UIColor.systemBackground))
                             .clipShape(Circle())
                             .overlay(Circle().stroke(Color.gray, lineWidth: 0.25))
                             .shadow(color: Color(UIColor(white: 0.8, alpha: 0.8)), radius: 8)
@@ -472,6 +503,8 @@ struct MapContainerView: View {
     private func startBoulderDraw() {
         // Mutually exclusive with picker mode — turning one on cancels the other.
         mapMakerTopoEntry.pickerModeEnabled = false
+        problemEntry.reset()
+        areaDrawEntry.reset()
         boulderDrawEntry.drawingEnabled = true
     }
 
@@ -505,6 +538,7 @@ struct MapContainerView: View {
         // Mutually exclusive with the other Map Maker modes.
         mapMakerTopoEntry.pickerModeEnabled = false
         boulderDrawEntry.reset()
+        areaDrawEntry.reset()
         problemEntry.reset()
         problemEntry.addingEnabled = true
     }
@@ -522,6 +556,32 @@ struct MapContainerView: View {
             problemEntry.savedProblemsVersion += 1
         }
         problemEntry.clearPending()
+    }
+
+    private func startAreaDraw() {
+        mapMakerTopoEntry.pickerModeEnabled = false
+        boulderDrawEntry.reset()
+        problemEntry.reset()
+        areaDrawEntry.drawingEnabled = true
+    }
+
+    private func saveAreaDraw() {
+        if AreaDrawSaver.save(entry: areaDrawEntry) != nil {
+            areaDrawEntry.savedAreasVersion += 1
+        }
+        areaDrawEntry.reset()
+    }
+
+    private func cancelAreaDraw() {
+        areaDrawEntry.reset()
+    }
+
+    private func deleteAreaDraw() {
+        if let filename = areaDrawEntry.editingFilename,
+           AreaDrawSaver.delete(filename: filename) {
+            areaDrawEntry.savedAreasVersion += 1
+        }
+        areaDrawEntry.reset()
     }
 
     /// Top banner shown while the user is in problem-add mode but hasn't
