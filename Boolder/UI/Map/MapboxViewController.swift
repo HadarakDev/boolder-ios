@@ -783,6 +783,11 @@ class MapboxViewController: UIViewController {
     /// Adds the empty GeoJSON sources + render layers for the in-progress
     /// boulder polygon. Called every time the style is (re)loaded so the
     /// overlay survives dark/light switches and Metal context resets.
+    /// Colour used for boulder polygon strokes / fills / vertex markers.
+    /// Distinct from `.appGreen` (which we keep for the climbing problems
+    /// layer) so the two overlays stay visually separated on the map.
+    fileprivate var boulderPolygonColor: UIColor { UIColor.systemGray }
+
     func setupBoulderDrawSourcesAndLayers() {
         do {
             // Sources
@@ -798,7 +803,7 @@ class MapboxViewController: UIViewController {
             }
 
             // Layers — fill, then stroke, then vertex circles on top.
-            let strokeColor = UIColor(resource: .appGreen)
+            let strokeColor = boulderPolygonColor
 
             if !mapView.mapboxMap.layerExists(withId: boulderDrawFillLayerId) {
                 var fill = FillLayer(id: boulderDrawFillLayerId, source: boulderDrawPolygonSourceId)
@@ -899,7 +904,7 @@ class MapboxViewController: UIViewController {
                 try mapView.mapboxMap.addSource(src)
             }
 
-            let strokeColor = UIColor(resource: .appGreen)
+            let strokeColor = boulderPolygonColor
 
             if !mapView.mapboxMap.layerExists(withId: savedBouldersFillLayerId) {
                 var fill = FillLayer(id: savedBouldersFillLayerId, source: savedBouldersSourceId)
