@@ -22,6 +22,9 @@ final class AreaDrawEntry {
     var isAveraging: Bool = false
     var savedAreasVersion: Int = 0
     var editingFilename: String?
+    /// Set when a saved area is tapped on the map outside of any Map
+    /// Maker mode — drives the top toolbar + the optional info sheet.
+    var viewingFilename: String?
 
     func reset() {
         drawingEnabled = false

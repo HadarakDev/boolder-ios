@@ -423,6 +423,13 @@ struct MapboxView: UIViewControllerRepresentable {
             entry.editingFilename = filename
         }
 
+        func viewCustomArea(filename: String) {
+            // Tapping a purple-bordered area in normal mode shows a
+            // floating top toolbar with its name + an info button.
+            guard let entry = areaDrawEntry else { return }
+            entry.viewingFilename = filename
+        }
+
         func selectCustomProblem(filename: String) {
             // Picker mode (camera FAB) toggles a custom problem in the
             // TopoEntry's customProblems array, mirroring how upstream

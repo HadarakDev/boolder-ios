@@ -555,10 +555,11 @@ class MapboxViewController: UIViewController {
             findProblemForPicking(tapPoint: tapPoint)
             return
         }
-        // Normal mode: a tap on a saved (custom) problem opens the
-        // read-only details sheet via the delegate. We hit-test this
-        // first; only on a miss do we fall through to upstream queries
-        // (so a green pin always wins over an underlying area/cluster).
+        // Normal mode hit-test priority:
+        //   1. Saved (custom) problem pin → details sheet.
+        //   2. Saved (custom) area polygon → top toolbar + info sheet.
+        //   3. Upstream Boolder layers (areas / clusters / problems / etc.).
+        // We have to chain because each Mapbox query is async.
         mapView.mapboxMap.queryRenderedFeatures(
             with: CGRect(x: tapPoint.x - 18, y: tapPoint.y - 18, width: 36, height: 36),
             options: RenderedQueryOptions(layerIds: [savedProblemsCirclesLayerId], filter: nil)
@@ -570,7 +571,19 @@ class MapboxViewController: UIViewController {
                 self.delegate?.viewCustomProblem(filename: filename)
                 return
             }
-            self.runUpstreamFeatureQueries(tapPoint: tapPoint)
+            self.mapView.mapboxMap.queryRenderedFeatures(
+                with: tapPoint,
+                options: RenderedQueryOptions(layerIds: [self.savedAreasFillLayerId], filter: nil)
+            ) { [weak self] result in
+                guard let self = self else { return }
+                if case .success(let features) = result,
+                   let f = features.first?.queriedFeature.feature,
+                   case .string(let filename) = f.properties?["filename"] {
+                    self.delegate?.viewCustomArea(filename: filename)
+                    return
+                }
+                self.runUpstreamFeatureQueries(tapPoint: tapPoint)
+            }
         }
         return
         #else
@@ -2179,5 +2192,6 @@ protocol MapBoxViewDelegate {
     func moveAreaVertex(vertexId: String, to coord: CLLocationCoordinate2D)
     func translateAreaPolygon(dLat: Double, dLon: Double)
     func editSavedArea(filename: String)
+    func viewCustomArea(filename: String)
     #endif
 }

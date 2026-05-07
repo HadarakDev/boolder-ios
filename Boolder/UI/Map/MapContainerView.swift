@@ -30,6 +30,7 @@ struct MapContainerView: View {
     @State private var problemEntry = ProblemEntry()
     @State private var areaDrawEntry = AreaDrawEntry()
     @State private var areaLocationAverager = LocationAverager()
+    @State private var presentAreaInfo = false
     #endif
 
     var body: some View {
@@ -83,6 +84,23 @@ struct MapContainerView: View {
                 .zIndex(20)
                 .transition(.opacity)
             }
+
+            // Floating top toolbar shown when a saved (custom) area is
+            // selected — analogous to upstream's AreaToolbarView.
+            if let viewing = areaDrawEntry.viewingFilename,
+               !areaDrawEntry.drawingEnabled,
+               let area = AreaLibrary.loadAll().first(where: { $0.filename == viewing }) {
+                CustomAreaToolbar(
+                    area: area,
+                    onClose: {
+                        areaDrawEntry.viewingFilename = nil
+                        presentAreaInfo = false
+                    },
+                    onInfo: { presentAreaInfo = true }
+                )
+                .zIndex(20)
+                .transition(.opacity)
+            }
             #endif
 
             if mapState.selectedArea == nil {
@@ -116,6 +134,19 @@ struct MapContainerView: View {
                 onCancel: { problemEntry.clearPending() },
                 onDelete: deleteProblem
             )
+        }
+        .sheet(isPresented: $presentAreaInfo) {
+            if let viewing = areaDrawEntry.viewingFilename,
+               let area = AreaLibrary.loadAll().first(where: { $0.filename == viewing }) {
+                CustomAreaInfoSheet(
+                    area: area,
+                    onClose: { presentAreaInfo = false },
+                    onSelectProblem: { p in
+                        presentAreaInfo = false
+                        problemEntry.viewingFilename = p.filename
+                    }
+                )
+            }
         }
         .sheet(isPresented: Binding(
             get: { problemEntry.viewingFilename != nil },
@@ -535,6 +566,7 @@ struct MapContainerView: View {
         mapMakerTopoEntry.pickerModeEnabled = false
         problemEntry.reset()
         areaDrawEntry.reset()
+        presentAreaInfo = false
         boulderDrawEntry.drawingEnabled = true
     }
 
