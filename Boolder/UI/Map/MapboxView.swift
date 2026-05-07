@@ -51,10 +51,12 @@ struct MapboxView: UIViewControllerRepresentable {
         } else {
             vc.updateBoulderDrawGeometry(vertexIds: [], coordinates: [])
         }
-        // Hide saved boulders only once the user has started reshaping (any
-        // vertex in the in-progress polygon). With an empty entry we keep
-        // them visible so the user can tap one to load it for edit.
+        // Hide saved boulders only when reshaping an *existing* polygon —
+        // that's where the duplicate-vertex visual issue happens. While
+        // drawing a brand-new polygon (no editingFilename), keep the other
+        // saved boulders visible so the user has spatial reference.
         let hideSaved = (boulderDrawEntry?.drawingEnabled ?? false)
+            && (boulderDrawEntry?.editingFilename != nil)
             && (boulderDrawEntry?.vertices.isEmpty == false)
         vc.setSavedBouldersHidden(hideSaved)
 
@@ -101,8 +103,10 @@ struct MapboxView: UIViewControllerRepresentable {
             vc.refreshSavedAreas()
         }
 
-        // Hide saved-areas overlay while editing one (avoids ghost outline).
+        // Same reasoning as boulders: only hide the saved-areas overlay when
+        // we're reshaping an existing area, not while drawing a fresh one.
         let hideAreas = (areaDrawEntry?.drawingEnabled ?? false)
+            && (areaDrawEntry?.editingFilename != nil)
             && (areaDrawEntry?.vertices.isEmpty == false)
         vc.setSavedAreasHidden(hideAreas)
         #endif
