@@ -218,6 +218,7 @@
 		B0BD0E0000000000000000F3 /* AreaLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0BD0E0000000000000000E3 /* AreaLibrary.swift */; };
 		B0BD0E0000000000000000F4 /* AreaDrawOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0BD0E0000000000000000E4 /* AreaDrawOverlay.swift */; };
 		B0BD0E0000000000000000D5 /* CustomProblemDetailsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0BD0E0000000000000000C5 /* CustomProblemDetailsSheet.swift */; };
+		B0BD0E0000000000000001A1 /* TopoCaptureLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0BD0E000000000000000191 /* TopoCaptureLibrary.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -341,6 +342,7 @@
 		B0BD0E0000000000000000E3 /* AreaLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreaLibrary.swift; sourceTree = "<group>"; };
 		B0BD0E0000000000000000E4 /* AreaDrawOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AreaDrawOverlay.swift; sourceTree = "<group>"; };
 		B0BD0E0000000000000000C5 /* CustomProblemDetailsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomProblemDetailsSheet.swift; sourceTree = "<group>"; };
+		B0BD0E000000000000000191 /* TopoCaptureLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopoCaptureLibrary.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -612,6 +614,7 @@
 				98C0B67F2FA8EAA4001DAC09 /* LocationFetcher.swift */,
 				98C0B6802FA8EAA4001DAC09 /* NewTopoView.swift */,
 				98C0B6812FA8EAA4001DAC09 /* TopoEntry.swift */,
+				B0BD0E000000000000000191 /* TopoCaptureLibrary.swift */,
 			);
 			path = Topo;
 			sourceTree = "<group>";
@@ -877,6 +880,7 @@
 				B0BD0E0000000000000000F3 /* AreaLibrary.swift in Sources */,
 				B0BD0E0000000000000000F4 /* AreaDrawOverlay.swift in Sources */,
 				B0BD0E0000000000000000D5 /* CustomProblemDetailsSheet.swift in Sources */,
+				B0BD0E0000000000000001A1 /* TopoCaptureLibrary.swift in Sources */,
 				3737991A258E619400711EDA /* CircleView.swift in Sources */,
 				038F7F472C3A8CC500AE7028 /* ClusterView.swift in Sources */,
 				031A61BC29EC7CE200B2B46E /* AppState.swift in Sources */,
